@@ -1,26 +1,33 @@
+// src/form.js
 function FormComponent() {
   const e = React.createElement;
   const [answer, setAnswer] = React.useState("");
   const [uuid, setUuid] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const [translations, setTranslations] = React.useState(null);
   const uuidRef = React.useRef(null);
   const lang = navigator.language.startsWith('en') ? 'en' : 'de';
 
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const uid = params.get('uid');
-    if (uid) {
-      loadPrefill(uid, data => {
-        if (!data.error && data.answers) {
-          setAnswer(data.answers.branche || "");
-          uuidRef.current = data.uuid;
-        }
+    // load translations first
+    loadTranslations().then(trans => {
+      setTranslations(trans);
+      // then handle prefill/uuid
+      const params = new URLSearchParams(window.location.search);
+      const uid = params.get('uid');
+      if (uid) {
+        loadPrefill(uid, data => {
+          if (!data.error && data.answers) {
+            setAnswer(data.answers.branche || "");
+            uuidRef.current = data.uuid;
+          }
+          setLoading(false);
+        });
+      } else {
+        uuidRef.current = generateUUID();
         setLoading(false);
-      });
-    } else {
-      uuidRef.current = generateUUID();
-      setLoading(false);
-    }
+      }
+    });
   }, []);
 
   const handleSubmit = eEvt => {
@@ -37,7 +44,7 @@ function FormComponent() {
     });
   };
 
-  if (loading) return e("p", {}, "Lade…");
+  if (!translations || loading) return e("p", {}, translations ? "Lade… Antwort…" : "Lade Übersetzungen…");
 
   if (uuid) {
     const link = `${window.location.origin}${window.location.pathname}?uid=${uuid}`;
