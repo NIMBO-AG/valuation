@@ -39,7 +39,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
     case 'checkbox':
       const values = Array.isArray(answer)
         ? answer
-        : (answer ? answer.toString().split(/\s*,\s*/) : []);
+        : (answer ? answer.toString().split(/,\\s*/) : []);
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         q.options.map(opt =>
@@ -76,7 +76,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       );
 
     case 'country':
-      const list = COUNTRIES[lang] || COUNTRIES['de'];
+      const list = COUNTRIES.de;  // Deutsch-Liste mit "Name (Code)" bereits drin
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('select', {
@@ -85,9 +85,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           className: 'w-full border rounded p-2'
         },
           list.map(c =>
-            e('option', { key: c.code, value: `${c.name} (${c.code})` },
-              `${c.name} (${c.code})`
-            )
+            e('option', { key: c.code, value: c.name }, c.name)
           )
         )
       );
