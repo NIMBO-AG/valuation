@@ -1,5 +1,5 @@
-// src/questions.js
-async function loadQuestions() {
-  const res = await fetch(QUESTIONS_URL);
+// src/blocks.js
+async function loadBlocks() {
+  const res = await fetch(BLOCKS_URL);
   return res.json();
 }
