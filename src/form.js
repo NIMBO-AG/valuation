@@ -6,7 +6,7 @@ function FormComponent() {
   const valuationId = params.get('uid');
   const isSubmitted = params.get('submitted') === 'true';
 
-  const [questions, setQuestions] = React.useState([]);
+  const [blocks, setBlocks] = React.useState([]);
   const [translations, setTranslations] = React.useState({});
   const [answers, setAnswers] = React.useState({});
   const [loading, setLoading] = React.useState(true);
@@ -14,9 +14,9 @@ function FormComponent() {
 
   React.useEffect(() => {
     Promise.all([fetchTranslationsCached(), fetchBlocks()])
-      .then(async ([transData, qData]) => {
+      .then(async ([transData, blockData]) => {
         setTranslations(transData[lang] || {});
-        setQuestions(qData);
+        setBlocks(blockData);
 
         if (valuationId && !isSubmitted) {
           fetchPrefill(valuationId, data => {
@@ -31,15 +31,15 @@ function FormComponent() {
           });
         } else {
           uuidRef.current = generateUUID();
-          const countryQ = qData.find(q => q.type === 'country');
-          if (countryQ) {
+          const countryBlock = blockData.find(q => q.type === 'country');
+          if (countryBlock) {
             try {
               const iso2 = await getCountryCodeByIP();
               if (iso2) {
                 const list = COUNTRIES[lang] || COUNTRIES['en'];
                 const match = list.find(c => c.code === iso2);
                 if (match) {
-                  setAnswers(prev => ({ ...prev, [countryQ.id]: match.name }));
+                  setAnswers(prev => ({ ...prev, [countryBlock.id]: match.name }));
                 }
               }
             } catch {}
@@ -52,11 +52,11 @@ function FormComponent() {
   const handleSubmit = eEvt => {
     eEvt.preventDefault();
     const myValId = uuidRef.current;
-    const link = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
+    const link = \`\${window.location.origin}\${window.location.pathname}?uid=\${myValId}\`;
     const payload = { uuid: myValId, lang, link, answers };
     setLoading(true);
     postAnswers(payload, () => {
-      window.location.search = `?uid=${myValId}&lang=${lang}&submitted=true`;
+      window.location.search = \`?uid=\${myValId}&lang=\${lang}&submitted=true\`;
     });
   };
 
@@ -89,7 +89,7 @@ function FormComponent() {
     }
   });
 
-  const visibleQs = questions.filter(q => {
+  const visibleBlocks = blocks.filter(q => {
     if (!q.visible_if) return true;
     try {
       const cond = q.visible_if.trim();
@@ -108,13 +108,17 @@ function FormComponent() {
   return e('div', {},
     switcher,
     e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
-      visibleQs.map(q => renderQuestion(
-        q,
-        answers[q.id] || (q.type==='checkbox'?[]:''),
-        val => setAnswers({ ...answers, [q.id]: val }),
-        translations,
-        lang
-      )),
+      visibleBlocks.map(q =>
+        e(React.Fragment, { key: q.id },
+          renderQuestion(
+            q,
+            answers[q.id] || (q.type === 'checkbox' ? [] : ''),
+            val => setAnswers({ ...answers, [q.id]: val }),
+            translations,
+            lang
+          )
+        )
+      ),
       e('button', {
         type: 'submit',
         className: 'bg-blue-600 text-white px-4 py-2 rounded'
