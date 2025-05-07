@@ -1,20 +1,64 @@
 // src/countries.js
-// List of country names localized in German (de) and English (en)
+// Länderliste mit ISO-2-Code und Name für DE und EN
 const COUNTRIES = {
   de: [
-    "Deutschland","Österreich","Schweiz","Frankreich","Italien","Spanien",
-    "Vereinigtes Königreich","Vereinigte Staaten","Kanada","Niederlande",
-    "Belgien","Luxemburg","Dänemark","Norwegen","Schweden","Finnland",
-    "Polen","Tschechien","Ungarn","Portugal","Griechenland","Irland",
-    "Japan","China","Indien","Australien","Neuseeland","Südkorea"
-    // ... weitere Länder hinzufügen
+    { code: 'DE', name: 'Deutschland' },
+    { code: 'AT', name: 'Österreich' },
+    { code: 'CH', name: 'Schweiz' },
+    { code: 'FR', name: 'Frankreich' },
+    { code: 'IT', name: 'Italien' },
+    { code: 'ES', name: 'Spanien' },
+    { code: 'GB', name: 'Vereinigtes Königreich' },
+    { code: 'US', name: 'Vereinigte Staaten' },
+    { code: 'CA', name: 'Kanada' },
+    { code: 'NL', name: 'Niederlande' },
+    { code: 'BE', name: 'Belgien' },
+    { code: 'LU', name: 'Luxemburg' },
+    { code: 'DK', name: 'Dänemark' },
+    { code: 'NO', name: 'Norwegen' },
+    { code: 'SE', name: 'Schweden' },
+    { code: 'FI', name: 'Finnland' },
+    { code: 'PL', name: 'Polen' },
+    { code: 'CZ', name: 'Tschechien' },
+    { code: 'HU', name: 'Ungarn' },
+    { code: 'PT', name: 'Portugal' },
+    { code: 'GR', name: 'Griechenland' },
+    { code: 'IE', name: 'Irland' },
+    { code: 'JP', name: 'Japan' },
+    { code: 'CN', name: 'China' },
+    { code: 'IN', name: 'Indien' },
+    { code: 'AU', name: 'Australien' },
+    { code: 'NZ', name: 'Neuseeland' },
+    { code: 'KR', name: 'Südkorea' }
   ],
   en: [
-    "Germany","Austria","Switzerland","France","Italy","Spain",
-    "United Kingdom","United States","Canada","Netherlands",
-    "Belgium","Luxembourg","Denmark","Norway","Sweden","Finland",
-    "Poland","Czech Republic","Hungary","Portugal","Greece","Ireland",
-    "Japan","China","India","Australia","New Zealand","South Korea"
-    // ... add more countries as needed
+    { code: 'DE', name: 'Germany' },
+    { code: 'AT', name: 'Austria' },
+    { code: 'CH', name: 'Switzerland' },
+    { code: 'FR', name: 'France' },
+    { code: 'IT', name: 'Italy' },
+    { code: 'ES', name: 'Spain' },
+    { code: 'GB', name: 'United Kingdom' },
+    { code: 'US', name: 'United States' },
+    { code: 'CA', name: 'Canada' },
+    { code: 'NL', name: 'Netherlands' },
+    { code: 'BE', name: 'Belgium' },
+    { code: 'LU', name: 'Luxembourg' },
+    { code: 'DK', name: 'Denmark' },
+    { code: 'NO', name: 'Norway' },
+    { code: 'SE', name: 'Sweden' },
+    { code: 'FI', name: 'Finland' },
+    { code: 'PL', name: 'Poland' },
+    { code: 'CZ', name: 'Czech Republic' },
+    { code: 'HU', name: 'Hungary' },
+    { code: 'PT', name: 'Portugal' },
+    { code: 'GR', name: 'Greece' },
+    { code: 'IE', name: 'Ireland' },
+    { code: 'JP', name: 'Japan' },
+    { code: 'CN', name: 'China' },
+    { code: 'IN', name: 'India' },
+    { code: 'AU', name: 'Australia' },
+    { code: 'NZ', name: 'New Zealand' },
+    { code: 'KR', name: 'South Korea' }
   ]
 };

@@ -3,23 +3,25 @@ function FormComponent() {
   const e = React.createElement;
   const params      = new URLSearchParams(window.location.search);
   const [lang, setLang] = React.useState(params.get('lang') || 'de');
-  const uid         = params.get('uid');
-  const isSubmitted = params.get('submitted') === 'true';
+  const valuationId  = params.get('uid');
+  const isSubmitted  = params.get('submitted') === 'true';
 
   const [questions, setQuestions]       = React.useState([]);
   const [translations, setTranslations] = React.useState({});
   const [answers, setAnswers]           = React.useState({});
   const [loading, setLoading]           = React.useState(true);
-  const uuidRef                          = React.useRef(uid || null);
+  const uuidRef                          = React.useRef(valuationId || null);
 
   React.useEffect(() => {
-    Promise.all([ fetchTranslationsCached(), fetchQuestions() ])
-      .then(([transData, qData]) => {
+    // Use an async IIFE inside then() to enable await
+    Promise.all([loadTranslations(), loadQuestions()])
+      .then(async ([transData, qData]) => {
         setTranslations(transData[lang] || {});
         setQuestions(qData);
-        if (uid && !isSubmitted) {
-          fetchPrefill(uid, data => {
-            // normalize checkbox answers if comma-delimited
+
+        if (valuationId && !isSubmitted) {
+          // Prefill existing answers
+          loadPrefill(valuationId, data => {
             const incoming = data.answers || {};
             const norm = {};
             Object.keys(incoming).forEach(key => {
@@ -34,7 +36,24 @@ function FormComponent() {
             setLoading(false);
           });
         } else {
+          // New form or after submit
           uuidRef.current = generateUUID();
+          // IP-Geolocation Default-Land for country questions
+          const countryQ = qData.find(q => q.type === 'country');
+          if (countryQ) {
+            try {
+              const iso2 = await getCountryCodeByIP();
+              if (iso2) {
+                const list = COUNTRIES[lang] || COUNTRIES['en'];
+                const match = list.find(c => c.code === iso2);
+                if (match) {
+                  setAnswers(prev => ({ ...prev, [countryQ.id]: match.name }));
+                }
+              }
+            } catch (_) {
+              // ignore geolocation errors
+            }
+          }
           setLoading(false);
         }
       });
@@ -42,12 +61,17 @@ function FormComponent() {
 
   const handleSubmit = eEvt => {
     eEvt.preventDefault();
-    const myUuid = uuidRef.current;
-    const link   = `${window.location.origin}${window.location.pathname}?uid=${myUuid}`;
-    const payload = { uuid: myUuid, lang, link, answers };
+    const myValId = uuidRef.current;
+    const link    = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
+    const payload = { uuid: myValId, lang, link, answers };
     setLoading(true);
-    postAnswers(payload, () => {
-      window.location.search = `?uid=${myUuid}&lang=${lang}&submitted=true`;
+    fetch(WEBHOOK_URL, {
+      method:  'POST',
+      mode:    'no-cors',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify(payload)
+    }).finally(() => {
+      window.location.search = `?uid=${myValId}&lang=${lang}&submitted=true`;
     });
   };
 
@@ -104,8 +128,8 @@ function FormComponent() {
         )
       ),
       e('button', {
-        type:'submit',
-        className:'bg-blue-600 text-white px-4 py-2 rounded'
+        type: 'submit',
+        className: 'bg-blue-600 text-white px-4 py-2 rounded'
       }, translations.submit)
     )
   );
