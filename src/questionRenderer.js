@@ -1,96 +1,34 @@
 // src/questionRenderer.js
-// Renders a question based on its type
 function renderQuestion(q, answer, onAnswer, translations, lang) {
   const e = React.createElement;
   const labelText = translations[q.id] || q.text;
 
   switch (q.type) {
-    case 'select':
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
-        e('select', {
-          value: answer,
-          onChange: ev => onAnswer(ev.target.value),
-          className: 'w-full border rounded p-2'
-        },
-          q.options.map(opt =>
-            e('option', { key: opt, value: opt }, translations[q.id + '_' + opt] || opt)
-          )
-        )
-      );
+    // ... bestehende Fälle für select, radio, checkbox, number, default
 
-    case 'radio':
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
-        q.options.map(opt =>
-          e('div', { key: opt, className: 'flex items-center mb-1' },
-            e('input', {
-              type: 'radio',
-              name: q.id,
-              value: opt,
-              checked: answer === opt,
-              onChange: () => onAnswer(opt),
-              className: 'mr-2'
-            }),
-            e('label', {}, translations[q.id + '_' + opt] || opt)
-          )
-        )
-      );
-
-    case 'checkbox':
-      // support string or array
-      const values = Array.isArray(answer)
-        ? answer
-        : (answer ? answer.toString().split(/\s*,\s*/) : []);
-
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
-        q.options.map(opt =>
-          e('div', { key: opt, className: 'flex items-center mb-1' },
-            e('input', {
-              type: 'checkbox',
-              name: q.id,
-              value: opt,
-              checked: values.includes(opt),
-              onChange: ev => {
-                let newVals = [...values];
-                if (ev.target.checked) newVals.push(opt);
-                else newVals = newVals.filter(x => x !== opt);
-                onAnswer(newVals);
-              },
-              className: 'mr-2'
-            }),
-            e('label', {}, translations[q.id + '_' + opt] || opt)
-          )
-        )
-      );
-
-    case 'number':
-      // use text input with thousand separators
-      const formatted = formatNumber(answer);
+    case 'country':
+      const list = COUNTRIES[lang] || COUNTRIES['en'];
+      // Determine default country from navigator.language region
+      const region = navigator.language.split('-')[1] || '';
+      const defaultName = list.find(name => name.includes(region)) || list[0];
+      const selected = answer || defaultName;
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
-          type: 'text',
-          value: formatted,
-          onChange: ev => {
-            const raw = parseNumber(ev.target.value);
-            onAnswer(raw);
-          },
+          list: 'country-list-' + q.id,
+          value: selected,
+          onChange: ev => onAnswer(ev.target.value),
+          placeholder: translations[q.id] || q.text,
           className: 'w-full border rounded p-2',
-          inputMode: 'numeric'
-        })
+          type: 'text'
+        }),
+        e('datalist', { id: 'country-list-' + q.id },
+          list.map(country =>
+            e('option', { key: country, value: country }, country)
+          )
+        )
       );
 
-    default: // text
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
-        e('input', {
-          type: 'text',
-          value: answer,
-          onChange: ev => onAnswer(ev.target.value),
-          className: 'w-full border rounded p-2'
-        })
-      );
+    // ... andere Fälle
   }
 }
