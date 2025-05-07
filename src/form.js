@@ -1,19 +1,19 @@
 // src/form.js
 function FormComponent() {
   const e = React.createElement;
-  const params      = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.search);
   const [lang, setLang] = React.useState(params.get('lang') || 'de');
-  const valuationId  = params.get('uid');
-  const isSubmitted  = params.get('submitted') === 'true';
+  const valuationId = params.get('uid');
+  const isSubmitted = params.get('submitted') === 'true';
 
-  const [questions, setQuestions]       = React.useState([]);
+  const [questions, setQuestions] = React.useState([]);
   const [translations, setTranslations] = React.useState({});
-  const [answers, setAnswers]           = React.useState({});
-  const [loading, setLoading]           = React.useState(true);
-  const uuidRef                          = React.useRef(valuationId || null);
+  const [answers, setAnswers] = React.useState({});
+  const [loading, setLoading] = React.useState(true);
+  const uuidRef = React.useRef(valuationId || null);
 
   React.useEffect(() => {
-    Promise.all([fetchTranslationsCached(), fetchQuestions()])
+    Promise.all([fetchTranslationsCached(), fetchBlocks()])
       .then(async ([transData, qData]) => {
         setTranslations(transData[lang] || {});
         setQuestions(qData);
@@ -31,7 +31,6 @@ function FormComponent() {
           });
         } else {
           uuidRef.current = generateUUID();
-          // Geo-IP default for country questions
           const countryQ = qData.find(q => q.type === 'country');
           if (countryQ) {
             try {
@@ -53,15 +52,15 @@ function FormComponent() {
   const handleSubmit = eEvt => {
     eEvt.preventDefault();
     const myValId = uuidRef.current;
-    const link    = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
+    const link = \`\${window.location.origin}\${window.location.pathname}?uid=\${myValId}\`;
     const payload = { uuid: myValId, lang, link, answers };
     setLoading(true);
     postAnswers(payload, () => {
-      window.location.search = `?uid=${myValId}&lang=${lang}&submitted=true`;
+      window.location.search = \`?uid=\${myValId}&lang=\${lang}&submitted=true\`;
     });
   };
 
-  if (loading) return e('p', {}, 'Lade…');
+  if (loading) return e('p', {}, translations.loading || 'Lade…');
 
   if (isSubmitted) {
     return e('div', { className: 'text-center' },
@@ -90,7 +89,6 @@ function FormComponent() {
     }
   });
 
-  // Improved visible_if logic: only support simple equals "field=="Value""
   const visibleQs = questions.filter(q => {
     if (!q.visible_if) return true;
     const cond = q.visible_if.trim();
@@ -114,8 +112,8 @@ function FormComponent() {
         lang
       )),
       e('button', {
-        type:'submit',
-        className:'bg-blue-600 text-white px-4 py-2 rounded'
+        type: 'submit',
+        className: 'bg-blue-600 text-white px-4 py-2 rounded'
       }, translations.submit)
     )
   );
