@@ -1,26 +1,36 @@
 // src/form.js
 function FormComponent() {
   const e = React.createElement;
-  const params       = new URLSearchParams(window.location.search);
+  const params      = new URLSearchParams(window.location.search);
   const [lang, setLang] = React.useState(params.get('lang') || 'de');
-  const uid          = params.get('uid');
-  const isSubmitted  = params.get('submitted') === 'true';
-  
+  const uid         = params.get('uid');
+  const isSubmitted = params.get('submitted') === 'true';
+
   const [questions, setQuestions]       = React.useState([]);
   const [translations, setTranslations] = React.useState({});
   const [answers, setAnswers]           = React.useState({});
   const [loading, setLoading]           = React.useState(true);
   const uuidRef                          = React.useRef(uid || null);
 
-  // Load translations + questions + optional prefill
   React.useEffect(() => {
-    Promise.all([loadTranslations(), loadQuestions()])
+    Promise.all([ fetchTranslationsCached(), fetchQuestions() ])
       .then(([transData, qData]) => {
         setTranslations(transData[lang] || {});
         setQuestions(qData);
-        if (uid) {
-          loadPrefill(uid, data => {
-            setAnswers(data.answers || {});
+        if (uid && !isSubmitted) {
+          fetchPrefill(uid, data => {
+            // normalize checkbox answers if comma-delimited
+            const incoming = data.answers || {};
+            const norm = {};
+            Object.keys(incoming).forEach(key => {
+              const val = incoming[key];
+              if (typeof val === 'string' && val.includes(',')) {
+                norm[key] = val.split(/\s*,\s*/);
+              } else {
+                norm[key] = val;
+              }
+            });
+            setAnswers(norm);
             setLoading(false);
           });
         } else {
@@ -36,12 +46,7 @@ function FormComponent() {
     const link   = `${window.location.origin}${window.location.pathname}?uid=${myUuid}`;
     const payload = { uuid: myUuid, lang, link, answers };
     setLoading(true);
-    fetch(WEBHOOK_URL, {
-      method:  'POST',
-      mode:    'no-cors',
-      headers: {'Content-Type':'application/json'},
-      body:    JSON.stringify(payload)
-    }).finally(() => {
+    postAnswers(payload, () => {
       window.location.search = `?uid=${myUuid}&lang=${lang}&submitted=true`;
     });
   };
@@ -50,14 +55,13 @@ function FormComponent() {
     return e('p', {}, 'Lade…');
   }
 
-  // Thank-You-View, only when submitted=true
   if (isSubmitted) {
     return e('div', { className: 'text-center' },
       e(LanguageSwitcher, {
         currentLang: lang,
         onChange: newLang => {
           params.set('lang', newLang);
-          window.history.replaceState(null,'', '?' + params.toString());
+          window.history.replaceState(null, '', '?' + params.toString());
           setLang(newLang);
         }
       }),
@@ -69,12 +73,11 @@ function FormComponent() {
     );
   }
 
-  // Otherwise render the form (including edit-mode uid prefill)
   const switcher = e(LanguageSwitcher, {
     currentLang: lang,
     onChange: newLang => {
       params.set('lang', newLang);
-      window.history.replaceState(null,'', '?' + params.toString());
+      window.history.replaceState(null, '', '?' + params.toString());
       setLang(newLang);
     }
   });
@@ -94,15 +97,15 @@ function FormComponent() {
       visibleQs.map(q =>
         renderQuestion(
           q,
-          answers[q.id] || (q.type==='checkbox'?[]:''),
+          answers[q.id] || (q.type === 'checkbox' ? [] : ''),
           val => setAnswers({ ...answers, [q.id]: val }),
           translations,
           lang
         )
       ),
       e('button', {
-        type: 'submit',
-        className: 'bg-blue-600 text-white px-4 py-2 rounded'
+        type:'submit',
+        className:'bg-blue-600 text-white px-4 py-2 rounded'
       }, translations.submit)
     )
   );
