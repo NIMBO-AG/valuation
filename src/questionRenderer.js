@@ -17,7 +17,6 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           )
         )
       );
-
     case 'radio':
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
@@ -35,11 +34,9 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           )
         )
       );
-
     case 'checkbox':
-      const values = Array.isArray(answer)
-        ? answer
-        : (answer ? answer.toString().split(/,\\s*/) : []);
+      const values = Array.isArray(answer) ?
+        answer : (answer ? answer.toString().split(/,\s*/) : []);
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         q.options.map(opt =>
@@ -61,7 +58,6 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           )
         )
       );
-
     case 'number':
       const formatted = formatNumber(answer);
       return e('div', {},
@@ -74,22 +70,22 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           className: 'w-full border rounded p-2'
         })
       );
-
     case 'country':
-      const list = COUNTRIES.de;  // Deutsch-Liste mit "Name (Code)" bereits drin
+      const list = COUNTRIES.de;
+      const placeholder = lang === 'de' ? 'Bitte wählen' : 'Please select';
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('select', {
-          value: answer,
+          value: answer || '',
           onChange: ev => onAnswer(ev.target.value),
           className: 'w-full border rounded p-2'
         },
+          e('option', { value: '', disabled: true }, placeholder),
           list.map(c =>
             e('option', { key: c.code, value: c.name }, c.name)
           )
         )
       );
-
     default:
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
