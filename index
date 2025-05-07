@@ -1,0 +1,99 @@
+<!-- 1) Tailwind CSS -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+
+<!-- 2) React + ReactDOM (defer + crossorigin) -->
+<script src="https://unpkg.com/react@17/umd/react.production.min.js" defer crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js" defer crossorigin="anonymous"></script>
+
+<!-- 3) Container -->
+<div id="nimbo-form" class="max-w-lg mx-auto p-4"></div>
+
+<!-- 4) Dein Formular-Script mit JSONP-Prefill -->
+<script defer>
+document.addEventListener('DOMContentLoaded', function() {
+  const e            = React.createElement;
+  const WEBHOOK_URL  = "https://script.google.com/macros/s/AKfycbwFEYW4nGPTRTmE2VGzZkSRRRvP-yc3RKhP4VOQdg9G5qatvwoMEiymVVGqJaZYQQE/exec";
+  const translations = {
+    de: { question:"Wie lautet Ihre Branche?", submit:"Absenden", thankYou:"Danke! Ihr Bearbeitungslink:" },
+    en: { question:"What is your industry?",    submit:"Submit",  thankYou:"Thanks! Your edit link:" }
+  };
+  const lang = navigator.language.startsWith('en') ? 'en' : 'de';
+
+  function Form() {
+    const [answer, setAnswer]   = React.useState("");
+    const [uuid,    setUuid]    = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
+    const uuidRef               = React.useRef(null);
+
+    // 1) Prefill via JSONP
+    React.useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      const uid    = params.get('uid');
+      if (uid) {
+        // Callback-Funktion für JSONP
+        window.handlePrefill = data => {
+          if (!data.error && data.answers) {
+            setAnswer(data.answers.branche || "");
+            uuidRef.current = data.uuid;
+          }
+          setLoading(false);
+        };
+        // Script-Tag einfügen
+        const tag = document.createElement('script');
+        tag.src = `${WEBHOOK_URL}?uid=${uid}&callback=handlePrefill`;
+        document.body.appendChild(tag);
+      } else {
+        // neues Formular
+        uuidRef.current = crypto.randomUUID
+          ? crypto.randomUUID()
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+              const r = Math.random()*16|0, v = c=='x'?r:(r&0x3|0x8);
+              return v.toString(16);
+            });
+        setLoading(false);
+      }
+    }, []);
+
+    // 2) Absenden per no-cors POST
+    const handleSubmit = eEvt => {
+      eEvt.preventDefault();
+      const myUuid = uuidRef.current;
+      const link   = `${window.location.origin}${window.location.pathname}?uid=${myUuid}`;
+      setUuid(myUuid);
+      const payload = { uuid: myUuid, lang, link, answers: { branche: answer } };
+      fetch(WEBHOOK_URL, {
+        method:  "POST",
+        mode:    "no-cors",
+        headers: { "Content-Type":"application/json" },
+        body:    JSON.stringify(payload)
+      });
+    };
+
+    // 3) Render-Logik
+    if (loading) {
+      return e("p", {}, "Lade…");
+    }
+    if (uuid) {
+      const link = `${window.location.origin}${window.location.pathname}?uid=${uuid}`;
+      return e("div",{className:"text-center"},
+        e("p",{},translations[lang].thankYou),
+        e("a",{href:link,className:"text-blue-600 underline"},link)
+      );
+    }
+    return e("form",{onSubmit:handleSubmit,className:"space-y-4"},
+      e("label",{className:"block font-medium"},translations[lang].question),
+      e("input",{
+        type:"text",required:true,
+        value: answer,
+        onChange: ev=>setAnswer(ev.target.value),
+        className:"w-full border rounded p-2"
+      }),
+      e("button",{type:"submit",className:"bg-blue-600 text-white px-4 py-2 rounded"},
+        translations[lang].submit
+      )
+    );
+  }
+
+  ReactDOM.render(e(Form), document.getElementById("nimbo-form"));
+});
+</script>
