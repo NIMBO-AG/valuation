@@ -1,120 +1,88 @@
 // src/form.js
-function FormComponent() {
-  const e = React.createElement;
-  const params = new URLSearchParams(window.location.search);
-  const [lang, setLang] = React.useState(params.get('lang') || 'de');
-  const valuationId = params.get('uid');
-  const isSubmitted = params.get('submitted') === 'true';
 
-  const [questions, setQuestions] = React.useState([]);
-  const [translations, setTranslations] = React.useState({});
-  const [answers, setAnswers] = React.useState({});
-  const [loading, setLoading] = React.useState(true);
-  const uuidRef = React.useRef(valuationId || null);
-
-  React.useEffect(() => {
-    Promise.all([fetchTranslationsCached(), fetchBlocks()])
-      .then(async ([transData, qData]) => {
-        setTranslations(transData[lang] || {});
-        setQuestions(qData);
-
-        if (valuationId && !isSubmitted) {
-          fetchPrefill(valuationId, data => {
-            const incoming = data.answers || {};
-            const norm = {};
-            Object.keys(incoming).forEach(key => {
-              const val = incoming[key];
-              norm[key] = (typeof val === 'string' && val.includes(',')) ? val.split(/\s*,\s*/) : val;
-            });
-            setAnswers(norm);
-            setLoading(false);
-          });
-        } else {
-          uuidRef.current = generateUUID();
-          const countryQ = qData.find(q => q.type === 'country');
-          if (countryQ) {
-            try {
-              const iso2 = await getCountryCodeByIP();
-              if (iso2) {
-                const list = COUNTRIES[lang] || COUNTRIES['en'];
-                const match = list.find(c => c.code === iso2);
-                if (match) {
-                  setAnswers(prev => ({ ...prev, [countryQ.id]: match.name }));
-                }
-              }
-            } catch {}
-          }
-          setLoading(false);
-        }
-      });
-  }, [lang]);
-
-  const handleSubmit = eEvt => {
-    eEvt.preventDefault();
-    const myValId = uuidRef.current;
-    const link = \`\${window.location.origin}\${window.location.pathname}?uid=\${myValId}\`;
-    const payload = { uuid: myValId, lang, link, answers };
-    setLoading(true);
-    postAnswers(payload, () => {
-      window.location.search = \`?uid=\${myValId}&lang=\${lang}&submitted=true\`;
-    });
-  };
-
-  if (loading) return e('p', {}, translations.loading || 'Lade…');
-
-  if (isSubmitted) {
-    return e('div', { className: 'text-center' },
-      e(LanguageSwitcher, {
-        currentLang: lang,
-        onChange: newLang => {
-          params.set('lang', newLang);
-          window.history.replaceState(null, '', '?' + params.toString());
-          setLang(newLang);
-        }
-      }),
-      e('p', {}, translations.thankYou),
-      e('a', {
-        href: window.location.href.replace('&submitted=true',''),
-        className: 'text-blue-600 underline'
-      }, window.location.href.replace('&submitted=true',''))
-    );
+class FormComponent extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      blocks: [],
+      answers: {},
+      loading: true,
+      error: null,
+    };
   }
 
-  const switcher = e(LanguageSwitcher, {
-    currentLang: lang,
-    onChange: newLang => {
-      params.set('lang', newLang);
-      window.history.replaceState(null, '', '?' + params.toString());
-      setLang(newLang);
-    }
-  });
+  componentDidMount() {
+    // load the questionnaire blocks
+    fetch(`${window.location.origin}${window.location.pathname}?blocks=true`)
+      .then(res => res.json())
+      .then(blocks => this.setState({ blocks, loading: false }))
+      .catch(error => this.setState({ error, loading: false }));
+  }
 
-  const visibleQs = questions.filter(q => {
-    if (!q.visible_if) return true;
-    const cond = q.visible_if.trim();
-    const match = cond.match(/^(\w+)\s*==\s*"(.+)"$/);
-    if (match) {
-      const field = match[1];
-      const value = match[2];
-      return answers[field] === value;
-    }
-    return true;
-  });
+  handleChange = (key, value) => {
+    this.setState(state => ({
+      answers: {
+        ...state.answers,
+        [key]: value
+      }
+    }));
+  }
 
-  return e('div', {},
-    switcher,
-    e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
-      visibleQs.map(q => renderQuestion(
-        q,
-        answers[q.id] || (q.type==='checkbox'?[]:''),
-        val => setAnswers({ ...answers, [q.id]: val }),
-        translations,
-        lang
-      )),
-      e('button', {
-        type: 'submit',
-        className: 'bg-blue-600 text-white px-4 py-2 rounded'
-      }, translations.submit)
-    )
-  );
+  handleSubmit = () => {
+    const myValId = this.props.uid || '';
+    const payload = {
+      uuid: myValId,
+      lang:  this.props.lang || 'en',
+      answers: this.state.answers,
+      link:  window.location.href
+    };
+
+    fetch('/exec', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(json => {
+      const link = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
+      alert(`Submitted! You can edit via:\n${link}`);
+    })
+    .catch(err => alert(`Submission failed: ${err.message}`));
+  }
+
+  render() {
+    const { blocks, loading, error } = this.state;
+    if (loading) return <div>Loading…</div>;
+    if (error)   return <div>Error: {error.message}</div>;
+
+    return (
+      <div>
+        {blocks.map(block => (
+          <div key={block.key}>
+            <label>{block.label}</label>
+            {block.options
+              ? <select onChange={e => this.handleChange(block.key, e.target.value)}>
+                  <option value="">– choose –</option>
+                  {block.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              : <input
+                  type={block.type || 'text'}
+                  onChange={e => this.handleChange(block.key, e.target.value)}
+                />
+            }
+          </div>
+        ))}
+        <button onClick={this.handleSubmit}>Submit</button>
+      </div>
+    );
+  }
 }
+
+const params = new URLSearchParams(window.location.search);
+const uid    = params.get('uid');
+const lang   = params.get('lang');
+
+ReactDOM.render(
+  <FormComponent uid={uid} lang={lang} />,
+  document.getElementById('root')
+);
