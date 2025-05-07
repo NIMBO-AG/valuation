@@ -17,24 +17,21 @@ function FormComponent() {
       .then(async ([transData, qData]) => {
         setTranslations(transData[lang] || {});
         setQuestions(qData);
+
         if (valuationId && !isSubmitted) {
           fetchPrefill(valuationId, data => {
             const incoming = data.answers || {};
             const norm = {};
             Object.keys(incoming).forEach(key => {
               const val = incoming[key];
-              if (typeof val === 'string' && val.includes(',')) {
-                norm[key] = val.split(/\s*,\s*/);
-              } else {
-                norm[key] = val;
-              }
+              norm[key] = (typeof val === 'string' && val.includes(',')) ? val.split(/\s*,\s*/) : val;
             });
             setAnswers(norm);
             setLoading(false);
           });
         } else {
           uuidRef.current = generateUUID();
-          // Geo-IP default for country
+          // Geo-IP default for country questions
           const countryQ = qData.find(q => q.type === 'country');
           if (countryQ) {
             try {
@@ -93,11 +90,17 @@ function FormComponent() {
     }
   });
 
+  // Improved visible_if logic: only support simple equals "field=="Value""
   const visibleQs = questions.filter(q => {
     if (!q.visible_if) return true;
-    try {
-      return Function('answers', `return ${q.visible_if}`)(answers);
-    } catch { return true; }
+    const cond = q.visible_if.trim();
+    const match = cond.match(/^(\w+)\s*==\s*"(.+)"$/);
+    if (match) {
+      const field = match[1];
+      const value = match[2];
+      return answers[field] === value;
+    }
+    return true;
   });
 
   return e('div', {},
