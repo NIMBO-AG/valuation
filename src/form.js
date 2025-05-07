@@ -1,104 +1,124 @@
-// src/form.js (no JSX)
+// src/form.js
+function FormComponent() {
+  const e = React.createElement;
+  const params = new URLSearchParams(window.location.search);
+  const [lang, setLang] = React.useState(params.get('lang') || 'de');
+  const valuationId = params.get('uid');
+  const isSubmitted = params.get('submitted') === 'true';
 
-class FormComponent extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      blocks: [],
-      answers: {},
-      loading: true,
-      error: null,
-    };
-  }
+  const [questions, setQuestions] = React.useState([]);
+  const [translations, setTranslations] = React.useState({});
+  const [answers, setAnswers] = React.useState({});
+  const [loading, setLoading] = React.useState(true);
+  const uuidRef = React.useRef(valuationId || null);
 
-  componentDidMount() {
-    // load the questionnaire blocks
-    fetch(`${window.location.origin}${window.location.pathname}?blocks=true`)
-      .then(res => res.json())
-      .then(blocks => this.setState({ blocks, loading: false }))
-      .catch(error => this.setState({ error, loading: false }));
-  }
+  React.useEffect(() => {
+    Promise.all([fetchTranslationsCached(), fetchBlocks()])
+      .then(async ([transData, qData]) => {
+        setTranslations(transData[lang] || {});
+        setQuestions(qData);
 
-  handleChange = (key, value) => {
-    this.setState(state => ({
-      answers: {
-        ...state.answers,
-        [key]: value
-      }
-    }));
-  }
+        if (valuationId && !isSubmitted) {
+          fetchPrefill(valuationId, data => {
+            const incoming = data.answers || {};
+            const norm = {};
+            Object.keys(incoming).forEach(key => {
+              const val = incoming[key];
+              norm[key] = (typeof val === 'string' && val.includes(',')) ? val.split(/\s*,\s*/) : val;
+            });
+            setAnswers(norm);
+            setLoading(false);
+          });
+        } else {
+          uuidRef.current = generateUUID();
+          const countryQ = qData.find(q => q.type === 'country');
+          if (countryQ) {
+            try {
+              const iso2 = await getCountryCodeByIP();
+              if (iso2) {
+                const list = COUNTRIES[lang] || COUNTRIES['en'];
+                const match = list.find(c => c.code === iso2);
+                if (match) {
+                  setAnswers(prev => ({ ...prev, [countryQ.id]: match.name }));
+                }
+              }
+            } catch {}
+          }
+          setLoading(false);
+        }
+      });
+  }, [lang]);
 
-  handleSubmit = () => {
-    const myValId = this.props.uid || '';
-    const payload = {
-      uuid: myValId,
-      lang:  this.props.lang || 'en',
-      answers: this.state.answers,
-      link:  window.location.href
-    };
-
-    fetch('/exec', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' }
-    })
-    .then(res => res.json())
-    .then(json => {
-      const link = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
-      alert('Submitted! You can edit via:\n' + link);
-    })
-    .catch(err => alert('Submission failed: ' + err.message));
-  }
-
-  render() {
-    const { blocks, loading, error } = this.state;
-    if (loading) {
-      return React.createElement('div', null, 'Loading…');
-    }
-    if (error) {
-      return React.createElement('div', null, 'Error: ' + error.message);
-    }
-
-    // build block elements
-    const blockElements = blocks.map(block => {
-      let inputElem;
-      if (block.options) {
-        const options = [React.createElement('option', { key: '_empty', value: '' }, '– choose –')].concat(
-          block.options.map(opt =>
-            React.createElement('option', { key: opt, value: opt }, opt)
-          )
-        );
-        inputElem = React.createElement('select', {
-          key: block.key + '_select',
-          onChange: e => this.handleChange(block.key, e.target.value)
-        }, ...options);
-      } else {
-        inputElem = React.createElement('input', {
-          key: block.key + '_input',
-          type: block.type || 'text',
-          onChange: e => this.handleChange(block.key, e.target.value)
-        });
-      }
-      return React.createElement('div', { key: block.key },
-        React.createElement('label', { key: block.key + '_label' }, block.label),
-        inputElem
-      );
+  const handleSubmit = eEvt => {
+    eEvt.preventDefault();
+    const myValId = uuidRef.current;
+    const link = \`\${window.location.origin}\${window.location.pathname}?uid=\${myValId}\`;
+    const payload = { uuid: myValId, lang, link, answers };
+    setLoading(true);
+    postAnswers(payload, () => {
+      window.location.search = \`?uid=\${myValId}&lang=\${lang}&submitted=true\`;
     });
+  };
 
-    return React.createElement('div', null,
-      ...blockElements,
-      React.createElement('button', { onClick: this.handleSubmit }, 'Submit')
+  if (loading) return e('p', {}, translations.loading || 'Lade…');
+
+  if (isSubmitted) {
+    return e('div', { className: 'text-center' },
+      e(LanguageSwitcher, {
+        currentLang: lang,
+        onChange: newLang => {
+          params.set('lang', newLang);
+          window.history.replaceState(null, '', '?' + params.toString());
+          setLang(newLang);
+        }
+      }),
+      e('p', {}, translations.thankYou),
+      e('a', {
+        href: window.location.href.replace('&submitted=true',''),
+        className: 'text-blue-600 underline'
+      }, window.location.href.replace('&submitted=true',''))
     );
   }
+
+  const switcher = e(LanguageSwitcher, {
+    currentLang: lang,
+    onChange: newLang => {
+      params.set('lang', newLang);
+      window.history.replaceState(null, '', '?' + params.toString());
+      setLang(newLang);
+    }
+  });
+
+  const visibleQs = questions.filter(q => {
+    if (!q.visible_if) return true;
+    try {
+      const cond = q.visible_if.trim();
+      const match = cond.match(/^(\w+)\s*==\s*"(.+)"$/);
+      if (match) {
+        const field = match[1];
+        const value = match[2];
+        return answers[field] === value;
+      }
+    } catch (err) {
+      console.warn("Invalid visible_if condition:", q.visible_if);
+    }
+    return true;
+  });
+
+  return e('div', {},
+    switcher,
+    e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
+      visibleQs.map(q => renderQuestion(
+        q,
+        answers[q.id] || (q.type==='checkbox'?[]:''),
+        val => setAnswers({ ...answers, [q.id]: val }),
+        translations,
+        lang
+      )),
+      e('button', {
+        type: 'submit',
+        className: 'bg-blue-600 text-white px-4 py-2 rounded'
+      }, translations.submit)
+    )
+  );
 }
-
-// parse URL params
-const params = new URLSearchParams(window.location.search);
-const uid    = params.get('uid');
-const lang   = params.get('lang');
-
-// render the form
-ReactDOM.render(
-  React.createElement(FormComponent, { uid: uid, lang: lang }),
-  document.getElementById('nimbo-form')
-);
