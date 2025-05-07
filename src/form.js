@@ -52,11 +52,11 @@ function FormComponent() {
   const handleSubmit = eEvt => {
     eEvt.preventDefault();
     const myValId = uuidRef.current;
-    const link = \`\${window.location.origin}\${window.location.pathname}?uid=\${myValId}\`;
+    const link = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
     const payload = { uuid: myValId, lang, link, answers };
     setLoading(true);
     postAnswers(payload, () => {
-      window.location.search = \`?uid=\${myValId}&lang=\${lang}&submitted=true\`;
+      window.location.search = `?uid=${myValId}&lang=${lang}&submitted=true`;
     });
   };
 
