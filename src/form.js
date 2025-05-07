@@ -1,4 +1,4 @@
-// src/form.js
+// src/form.js (no JSX)
 
 class FormComponent extends React.Component {
   constructor(props) {
@@ -45,44 +45,60 @@ class FormComponent extends React.Component {
     .then(res => res.json())
     .then(json => {
       const link = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
-      alert(`Submitted! You can edit via:\n${link}`);
+      alert('Submitted! You can edit via:\n' + link);
     })
-    .catch(err => alert(`Submission failed: ${err.message}`));
+    .catch(err => alert('Submission failed: ' + err.message));
   }
 
   render() {
     const { blocks, loading, error } = this.state;
-    if (loading) return <div>Loading…</div>;
-    if (error)   return <div>Error: {error.message}</div>;
+    if (loading) {
+      return React.createElement('div', null, 'Loading…');
+    }
+    if (error) {
+      return React.createElement('div', null, 'Error: ' + error.message);
+    }
 
-    return (
-      <div>
-        {blocks.map(block => (
-          <div key={block.key}>
-            <label>{block.label}</label>
-            {block.options
-              ? <select onChange={e => this.handleChange(block.key, e.target.value)}>
-                  <option value="">– choose –</option>
-                  {block.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              : <input
-                  type={block.type || 'text'}
-                  onChange={e => this.handleChange(block.key, e.target.value)}
-                />
-            }
-          </div>
-        ))}
-        <button onClick={this.handleSubmit}>Submit</button>
-      </div>
+    // build block elements
+    const blockElements = blocks.map(block => {
+      let inputElem;
+      if (block.options) {
+        const options = [React.createElement('option', { key: '_empty', value: '' }, '– choose –')].concat(
+          block.options.map(opt =>
+            React.createElement('option', { key: opt, value: opt }, opt)
+          )
+        );
+        inputElem = React.createElement('select', {
+          key: block.key + '_select',
+          onChange: e => this.handleChange(block.key, e.target.value)
+        }, ...options);
+      } else {
+        inputElem = React.createElement('input', {
+          key: block.key + '_input',
+          type: block.type || 'text',
+          onChange: e => this.handleChange(block.key, e.target.value)
+        });
+      }
+      return React.createElement('div', { key: block.key },
+        React.createElement('label', { key: block.key + '_label' }, block.label),
+        inputElem
+      );
+    });
+
+    return React.createElement('div', null,
+      ...blockElements,
+      React.createElement('button', { onClick: this.handleSubmit }, 'Submit')
     );
   }
 }
 
+// parse URL params
 const params = new URLSearchParams(window.location.search);
 const uid    = params.get('uid');
 const lang   = params.get('lang');
 
+// render the form
 ReactDOM.render(
-  <FormComponent uid={uid} lang={lang} />,
+  React.createElement(FormComponent, { uid: uid, lang: lang }),
   document.getElementById('root')
 );
