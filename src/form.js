@@ -100,5 +100,5 @@ const lang   = params.get('lang');
 // render the form
 ReactDOM.render(
   React.createElement(FormComponent, { uid: uid, lang: lang }),
-  document.getElementById('root')
+  document.getElementById('nimbo-form')
 );
