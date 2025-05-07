@@ -1,7 +1,8 @@
 // src/api.js
-function fetchQuestions() {
-  return fetch(QUESTIONS_URL).then(res => res.json());
+function fetchBlocks() {
+  return fetch(BLOCKS_URL).then(res => res.json());
 }
+
 
 function fetchTranslationsCached() {
   return loadTranslations(); // uses caching in translations.js
