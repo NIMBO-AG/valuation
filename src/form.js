@@ -1,50 +1,51 @@
 // src/form.js
 function FormComponent() {
   const e = React.createElement;
-  const [lang, setLang] = React.useState(
-    new URLSearchParams(window.location.search).get('lang') || 'de'
-  );
-  const [translations, setTranslations] = React.useState(null);
-  const [answer, setAnswer] = React.useState('');
-  const [uuid, setUuid] = React.useState(null);
+  const [lang, setLang] = React.useState(new URLSearchParams(window.location.search).get('lang') || 'de');
+  const [questions, setQuestions] = React.useState([]);
+  const [translations, setTranslations] = React.useState({});
+  const [answers, setAnswers] = React.useState({});
   const [loading, setLoading] = React.useState(true);
   const uuidRef = React.useRef(null);
 
   React.useEffect(() => {
-    loadTranslations().then(trans => {
-      setTranslations(trans);
-      const params = new URLSearchParams(window.location.search);
-      const uid = params.get('uid');
-      if (uid) {
-        loadPrefill(uid, data => {
-          if (!data.error && data.answers) {
-            setAnswer(data.answers.branche || '');
+    Promise.all([loadTranslations(), loadQuestions()])
+      .then(([transData, qData]) => {
+        setTranslations(transData[lang] || {});
+        setQuestions(qData);
+        const params = new URLSearchParams(window.location.search);
+        const uid = params.get('uid');
+        if (uid) {
+          loadPrefill(uid, data => {
+            setAnswers(data.answers || {});
             uuidRef.current = data.uuid;
-          }
+            setLoading(false);
+          });
+        } else {
+          uuidRef.current = generateUUID();
           setLoading(false);
-        });
-      } else {
-        uuidRef.current = generateUUID();
-        setLoading(false);
-      }
-    });
-  }, []);
+        }
+      });
+  }, [lang]);
 
   const handleSubmit = eEvt => {
     eEvt.preventDefault();
     const myUuid = uuidRef.current;
     const link = `${window.location.origin}${window.location.pathname}?uid=${myUuid}`;
-    setUuid(myUuid);
-    const payload = { uuid: myUuid, lang, link, answers: { branche: answer } };
+    const payload = { uuid: myUuid, lang, link, answers };
+    setAnswers(answers);
+    setLoading(true);
     fetch(WEBHOOK_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
+    setLoading(false);
+    window.location.search = '?uid=' + myUuid + '&lang=' + lang;
   };
 
-  if (!translations || loading) {
+  if (loading) {
     return e('p', {}, 'Lade…');
   }
 
@@ -58,26 +59,35 @@ function FormComponent() {
     }
   });
 
-  if (uuid) {
-    return e('div', { className: 'text-center' },
+  // Evaluate visibility
+  const visibleQs = questions.filter(q => {
+    if (!q.visible_if) return true;
+    try {
+      const cond = q.visible_if.replace(/(\w+)/g, 'answers.$1');
+      return Function('answers', `return ${cond}`)(answers);
+    } catch(e) {
+      return true;
+    }
+  });
+
+  if (uuidRef.current && Object.keys(answers || {}).length && !loading) {
+    return e('div', {className:'text-center'},
       switcher,
-      e('p', {}, translations[lang].thankYou),
-      e('a', { href: window.location.href, className: 'text-blue-600 underline' }, window.location.href)
+      e('p', {}, translations.thankYou),
+      e('a', {href: window.location.href, className:'text-blue-600 underline'}, window.location.href)
     );
   }
 
   return e('div', {},
     switcher,
-    e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
-      e('label', { className: 'block font-medium' }, translations[lang].question),
-      e('input', {
-        type: 'text', required: true,
-        value: answer,
-        onChange: ev => setAnswer(ev.target.value),
-        className: 'w-full border rounded p-2'
-      }),
-      e('button', { type: 'submit', className: 'bg-blue-600 text-white px-4 py-2 rounded' },
-        translations[lang].submit
+    e('form', {onSubmit: handleSubmit, className: 'space-y-4'},
+      visibleQs.map(q =>
+        renderQuestion(q, answers[q.id] || (q.type==='checkbox'?[]:''), val =>
+          setAnswers({...answers, [q.id]: val}),
+        translations, lang)
+      ),
+      e('button', {type:'submit', className:'bg-blue-600 text-white px-4 py-2 rounded'},
+        translations.submit
       )
     )
   );
