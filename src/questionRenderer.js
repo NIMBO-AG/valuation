@@ -12,12 +12,12 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
   switch (q.type) {
     case 'text':
       // reiner Text-Block ohne Eingabe
-      return e('div', { className: 'mb-4', key: q.key },
+      return e('div', { className: 'mb-4' },
         e('p', {}, q.text)
       );
 
     case 'select':
-      return e('div', { key: q.key },
+      return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('select', {
           value: answer,
@@ -31,7 +31,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       );
 
     case 'radio':
-      return e('div', { key: q.key },
+      return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
@@ -52,7 +52,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       const values = Array.isArray(answer)
         ? answer
         : (answer ? answer.toString().split(/,\s*/) : []);
-      return e('div', { key: q.key },
+      return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
@@ -76,7 +76,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
 
     case 'number':
       const formatted = formatNumber(answer);
-      return e('div', { key: q.key },
+      return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
           type: 'text',
@@ -93,7 +93,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       // Placeholder-Text übersetzbar über Key "country.placeholder"
       const placeholder = translations['country.placeholder']
         || (lang === 'de' ? 'Bitte wählen' : 'Please select');
-      return e('div', { key: q.key },
+      return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('select', {
           value: answer || '',
@@ -111,7 +111,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
 
     default:
       // Fallback: einfaches Textfeld
-      return e('div', { key: q.key },
+      return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
           type: 'text',
