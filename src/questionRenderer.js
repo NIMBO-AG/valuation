@@ -3,17 +3,15 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
   const e = React.createElement;
 
   // 1) Label/Text fürs gesamte Element
-  //    zuerst Key-Übersetzung, dann q.text
   const labelText = translations[q.key] || q.text || '';
 
-  // 2) Optionen – immer als eine Semikolon-Liste in "<Key> | Options"
+  // 2) Optionen als eine Semikolon-Liste in "<Key> | Options"
   const optionsKey = `${q.key} | Options`;
-  const raw = translations[optionsKey] || (q.options || []).join(';');
-  const options = raw.split(';').filter(opt => opt !== '');
+  const raw        = translations[optionsKey] || (q.options || []).join(';');
+  const options    = raw.split(';').filter(opt => opt !== '');
 
   switch (q.type) {
     case 'text':
-      // reiner Paragraph, übersetzbar über q.key
       return e('div', { className: 'mb-4' },
         e('p', {}, labelText)
       );
@@ -90,10 +88,19 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       );
 
     case 'country':
-      // wir brauchen nur die Codes aus COUNTRIES.de, das Label kommt aus translations
-      const codes = COUNTRIES.de.map(c => c.code);
+      // 1) Hole alle Länder-Objekte
+      const list = COUNTRIES.de; 
+      // 2) Baue ein Array mit Label aus Übersetzungen oder Fallback-Namen
+      const sortedList = list.slice().sort((a, b) => {
+        const labelA = translations[`country.${a.code}`] || a.name;
+        const labelB = translations[`country.${b.code}`] || b.name;
+        // localeCompare mit aktuellem lang für korrekte Sortierung
+        return labelA.localeCompare(labelB, lang);
+      });
+      // 3) Placeholder ebenfalls übersetzbar
       const placeholder = translations['country.placeholder']
         || (lang === 'de' ? 'Bitte wählen' : 'Please select');
+
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('select', {
@@ -102,16 +109,16 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           className: 'w-full border rounded p-2'
         },
           e('option', { value: '', disabled: true }, placeholder),
-          codes.map(code =>
-            e('option', { key: code, value: code },
-              translations[`country.${code}`] || code
+          // 4) Rendern der sortierten Liste
+          sortedList.map(c =>
+            e('option', { key: c.code, value: c.code },
+              translations[`country.${c.code}`] || c.name
             )
           )
         )
       );
 
     default:
-      // alle anderen Fälle: einfaches Text-Input, Label wie oben
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
@@ -123,3 +130,6 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       );
   }
 }
+
+// global verfügbar machen, falls Dein build keine Module nutzt
+window.renderQuestion = renderQuestion;
