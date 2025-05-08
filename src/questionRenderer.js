@@ -1,7 +1,8 @@
 // src/questionRenderer.js
 function renderQuestion(q, answer, onAnswer, translations, lang) {
   const e = React.createElement;
-  const labelText = translations[q.id] || q.text;
+  // labelText holt sich jetzt den Wert über q.key statt q.id
+  const labelText = translations[q.key] || q.text;
 
   switch (q.type) {
     case 'text':
@@ -19,7 +20,8 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           className: 'w-full border rounded p-2'
         },
           q.options.map(opt =>
-            e('option', { key: opt, value: opt }, translations[q.id + '_' + opt] || opt)
+            // auch hier Übersetzungs-Key mit q.key
+            e('option', { key: opt, value: opt }, translations[q.key + '_' + opt] || opt)
           )
         )
       );
@@ -30,12 +32,14 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
         q.options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
-              type: 'radio', name: q.id, value: opt,
+              type: 'radio',
+              name: q.key,
+              value: opt,
               checked: answer === opt,
               onChange: () => onAnswer(opt),
               className: 'mr-2'
             }),
-            e('label', {}, translations[q.id + '_' + opt] || opt)
+            e('label', {}, translations[q.key + '_' + opt] || opt)
           )
         )
       );
@@ -48,7 +52,9 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
         q.options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
-              type: 'checkbox', name: q.id, value: opt,
+              type: 'checkbox',
+              name: q.key,
+              value: opt,
               checked: values.includes(opt),
               onChange: ev => {
                 let newVals = [...values];
@@ -58,7 +64,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
               },
               className: 'mr-2'
             }),
-            e('label', {}, translations[q.id + '_' + opt] || opt)
+            e('label', {}, translations[q.key + '_' + opt] || opt)
           )
         )
       );
@@ -68,7 +74,8 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
-          type: 'text', inputMode: 'numeric',
+          type: 'text',
+          inputMode: 'numeric',
           value: formatted,
           onChange: ev => onAnswer(parseNumber(ev.target.value)),
           className: 'w-full border rounded p-2'
@@ -96,7 +103,8 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
-          type: 'text', value: answer,
+          type: 'text',
+          value: answer,
           onChange: ev => onAnswer(ev.target.value),
           className: 'w-full border rounded p-2'
         })
