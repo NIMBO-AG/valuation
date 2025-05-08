@@ -1,35 +1,39 @@
 // src/questionRenderer.js
 function renderQuestion(q, answer, onAnswer, translations, lang) {
   const e = React.createElement;
-  // labelText holt sich jetzt den Wert über q.key statt q.id
+  // Frage-Label aus Übersetzungen oder Fallback aus q.text
   const labelText = translations[q.key] || q.text;
+
+  // Neue Logik: Optionen als eine Semikolon-Liste holen & in Array splitten
+  const optionsKey = `${q.key} | Options`;
+  const optionsRaw = translations[optionsKey] || (q.options || []).join(';');
+  const options    = optionsRaw.split(';');
 
   switch (q.type) {
     case 'text':
       // reiner Text-Block ohne Eingabe
-      return e('div', { className: 'mb-4' },
+      return e('div', { className: 'mb-4', key: q.key },
         e('p', {}, q.text)
       );
 
     case 'select':
-      return e('div', {},
+      return e('div', { key: q.key },
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('select', {
           value: answer,
           onChange: ev => onAnswer(ev.target.value),
           className: 'w-full border rounded p-2'
         },
-          q.options.map(opt =>
-            // auch hier Übersetzungs-Key mit q.key
-            e('option', { key: opt, value: opt }, translations[q.key + '_' + opt] || opt)
+          options.map(opt =>
+            e('option', { key: opt, value: opt }, opt)
           )
         )
       );
 
     case 'radio':
-      return e('div', {},
+      return e('div', { key: q.key },
         e('label', { className: 'block font-medium mb-1' }, labelText),
-        q.options.map(opt =>
+        options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
               type: 'radio',
@@ -39,17 +43,18 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
               onChange: () => onAnswer(opt),
               className: 'mr-2'
             }),
-            e('label', {}, translations[q.key + '_' + opt] || opt)
+            e('label', {}, opt)
           )
         )
       );
 
     case 'checkbox':
       const values = Array.isArray(answer)
-        ? answer : (answer ? answer.toString().split(/,\s*/) : []);
-      return e('div', {},
+        ? answer
+        : (answer ? answer.toString().split(/,\s*/) : []);
+      return e('div', { key: q.key },
         e('label', { className: 'block font-medium mb-1' }, labelText),
-        q.options.map(opt =>
+        options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
               type: 'checkbox',
@@ -64,14 +69,14 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
               },
               className: 'mr-2'
             }),
-            e('label', {}, translations[q.key + '_' + opt] || opt)
+            e('label', {}, opt)
           )
         )
       );
 
     case 'number':
       const formatted = formatNumber(answer);
-      return e('div', {},
+      return e('div', { key: q.key },
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
           type: 'text',
@@ -85,7 +90,7 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
     case 'country':
       const list = COUNTRIES.de;
       const placeholder = lang === 'de' ? 'Bitte wählen' : 'Please select';
-      return e('div', {},
+      return e('div', { key: q.key },
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('select', {
           value: answer || '',
@@ -100,7 +105,8 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       );
 
     default:
-      return e('div', {},
+      // Fallback: einfaches Textfeld
+      return e('div', { key: q.key },
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
           type: 'text',
