@@ -122,3 +122,4 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       );
   }
 }
+ 
