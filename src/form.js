@@ -1,7 +1,7 @@
 // src/form.js
 function FormComponent() {
   const e = React.createElement;
-  const params      = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.search);
   const [lang, setLang]       = React.useState(params.get('lang') || 'de');
   const valuationId            = params.get('uid');
   const isSubmitted            = params.get('submitted') === 'true';
@@ -9,11 +9,11 @@ function FormComponent() {
   const updateMode             = Boolean(valuationId);
   const freeMode               = freeCode && freeCode !== '-';
 
-  const [blocks, setBlocks]           = React.useState([]);
+  const [blocks, setBlocks]             = React.useState([]);
   const [translations, setTranslations] = React.useState({});
-  const [answers, setAnswers]         = React.useState({});
-  const [loading, setLoading]         = React.useState(true);
-  const uuidRef                       = React.useRef(valuationId || null);
+  const [answers, setAnswers]           = React.useState({});
+  const [loading, setLoading]           = React.useState(true);
+  const uuidRef                         = React.useRef(valuationId || null);
 
   React.useEffect(() => {
     Promise.all([fetchTranslationsCached(), fetchBlocks()])
@@ -28,8 +28,8 @@ function FormComponent() {
             const norm = {};
             Object.keys(incoming).forEach(key => {
               const val = incoming[key];
-              norm[key] = (typeof val === 'string' && val.includes(',')) 
-                ? val.split(/\s*,\s*/) 
+              norm[key] = (typeof val === 'string' && val.includes(','))
+                ? val.split(/\s*,\s*/)
                 : val;
             });
             setAnswers(norm);
@@ -47,7 +47,10 @@ function FormComponent() {
                 const list = COUNTRIES[lang] || COUNTRIES['en'];
                 const match = list.find(c => c.code === iso2);
                 if (match) {
-                  setAnswers(prev => ({ ...prev, [countryBlock.key]: match.name }));
+                  setAnswers(prev => ({
+                    ...prev,
+                    [countryBlock.key]: match.code
+                  }));
                 }
               })
               .catch(() => {});
@@ -79,7 +82,9 @@ function FormComponent() {
     });
   };
 
-  if (loading) return e('p', {}, translations.loading || 'Lade…');
+  if (loading) {
+    return e('p', {}, translations.loading || 'Lade…');
+  }
 
   if (isSubmitted) {
     return e('div', { className: 'text-center' },
@@ -93,9 +98,9 @@ function FormComponent() {
       }),
       e('p', {}, translations.thankYou),
       e('a', {
-        href: window.location.href.replace('&submitted=true',''),
+        href: window.location.href.replace('&submitted=true', ''),
         className: 'text-blue-600 underline'
-      }, window.location.href.replace('&submitted=true',''))
+      }, window.location.href.replace('&submitted=true', ''))
     );
   }
 
@@ -108,33 +113,32 @@ function FormComponent() {
     }
   });
 
-  // Sichtbarkeits-Filter mit Update/Free Mode und Visible If
-  const visibleBlocks = blocks.filter(b => {
-    // Update Mode
-    const um = b['Update Mode'] || '';
-    if (updateMode) {
-      if (um === 'hide in update mode') return false;
-    } else if (um === 'only in update mode') {
-      return false;
-    }
-    // Free Mode
-    const fm = b['Free Mode'] || '';
-    if (freeMode) {
-      if (fm === 'hide in free mode') return false;
-    } else if (fm === 'only in free mode') {
-      return false;
-    }
-    // Visible If (mit neuem Spaltennamen)
-    const condRaw = b['Visible If'];
-    if (!condRaw) return true;
-    try {
-      const m = condRaw.trim().match(/^(\w+)\s*==\s*"(.+)"$/);
-      if (m) return answers[m[1]] === m[2];
-    } catch (err) {
-      console.warn('Invalid Visible If:', condRaw);
-    }
-    return true;
-  });
+  // Filter: nur Blocks mit non-empty key und nach Update/Free Mode und Visible If
+  const visibleBlocks = blocks
+    .filter(b => b.key && b.key.trim())
+    .filter(b => {
+      const um = b['Update Mode'] || '';
+      if (updateMode) {
+        if (um === 'hide in update mode') return false;
+      } else if (um === 'only in update mode') {
+        return false;
+      }
+      const fm = b['Free Mode'] || '';
+      if (freeMode) {
+        if (fm === 'hide in free mode') return false;
+      } else if (fm === 'only in free mode') {
+        return false;
+      }
+      const condRaw = b['Visible If'];
+      if (!condRaw) return true;
+      try {
+        const m = condRaw.trim().match(/^(\w+)\s*==\s*"(.+)"$/);
+        if (m) return answers[m[1]] === m[2];
+      } catch (err) {
+        console.warn('Invalid Visible If:', condRaw);
+      }
+      return true;
+    });
 
   return e('div', {},
     switcher,
@@ -158,5 +162,5 @@ function FormComponent() {
   );
 }
 
-// In src/app.js or index.html:
+// In src/app.js oder index.html:
 // ReactDOM.render(React.createElement(FormComponent), document.getElementById('nimbo-form'));
