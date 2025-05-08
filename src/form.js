@@ -56,7 +56,7 @@ function FormComponent() {
     const payload = { uuid: myValId, lang, link, answers };
     setLoading(true);
     postAnswers(payload, () => {
-      window.location.search = \`?uid=\${myValId}&lang=\${lang}&submitted=true\`;
+window.location.search = `?uid=${myValId}&lang=${lang}&submitted=true`;
     });
   };
 
