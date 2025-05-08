@@ -2,12 +2,12 @@
 function FormComponent() {
   const e = React.createElement;
   const params      = new URLSearchParams(window.location.search);
-  const [lang, setLang] = React.useState(params.get('lang') || 'de');
-  const valuationId  = params.get('uid');
-  const isSubmitted  = params.get('submitted') === 'true';
-  const freeCode     = params.get('free_code') || '';
-  const updateMode   = Boolean(valuationId);
-  const freeMode     = freeCode && freeCode !== '-';
+  const [lang, setLang]       = React.useState(params.get('lang') || 'de');
+  const valuationId            = params.get('uid');
+  const isSubmitted            = params.get('submitted') === 'true';
+  const freeCode               = params.get('free_code') || '';
+  const updateMode             = Boolean(valuationId);
+  const freeMode               = freeCode && freeCode !== '-';
 
   const [blocks, setBlocks]           = React.useState([]);
   const [translations, setTranslations] = React.useState({});
@@ -41,19 +41,16 @@ function FormComponent() {
           // Geo-IP default Country
           const countryBlock = blockData.find(b => b.type === 'country');
           if (countryBlock) {
-            try {
-              const iso2 = await getCountryCodeByIP();
-              if (iso2) {
+            getCountryCodeByIP()
+              .then(iso2 => {
+                if (!iso2) return;
                 const list = COUNTRIES[lang] || COUNTRIES['en'];
                 const match = list.find(c => c.code === iso2);
                 if (match) {
-                  setAnswers(prev => ({ 
-                    ...prev, 
-                    [countryBlock.key]: match.name 
-                  }));
+                  setAnswers(prev => ({ ...prev, [countryBlock.key]: match.name }));
                 }
-              }
-            } catch {}
+              })
+              .catch(() => {});
           }
           setLoading(false);
         }
@@ -75,7 +72,6 @@ function FormComponent() {
     };
     setLoading(true);
     postAnswers(payload, () => {
-      // URL anpassen
       params.set('uid', myValId);
       params.set('submitted', 'true');
       if (freeCode) params.set('free_code', freeCode);
@@ -89,10 +85,10 @@ function FormComponent() {
     return e('div', { className: 'text-center' },
       e(LanguageSwitcher, {
         currentLang: lang,
-        onChange: nl => {
-          params.set('lang', nl);
+        onChange: newLang => {
+          params.set('lang', newLang);
           window.history.replaceState(null, '', '?' + params.toString());
-          setLang(nl);
+          setLang(newLang);
         }
       }),
       e('p', {}, translations.thankYou),
@@ -105,10 +101,10 @@ function FormComponent() {
 
   const switcher = e(LanguageSwitcher, {
     currentLang: lang,
-    onChange: nl => {
-      params.set('lang', nl);
+    onChange: newLang => {
+      params.set('lang', newLang);
       window.history.replaceState(null, '', '?' + params.toString());
-      setLang(nl);
+      setLang(newLang);
     }
   });
 
@@ -128,15 +124,12 @@ function FormComponent() {
     } else if (fm === 'only in free mode') {
       return false;
     }
-    // Visible If (nun mit neuem Spaltennamen)
+    // Visible If (mit neuem Spaltennamen)
     const condRaw = b['Visible If'];
     if (!condRaw) return true;
     try {
-      const cond = condRaw.trim();
-      const m    = cond.match(/^(\w+)\s*==\s*"(.+)"$/);
-      if (m) {
-        return answers[m[1]] === m[2];
-      }
+      const m = condRaw.trim().match(/^(\w+)\s*==\s*"(.+)"$/);
+      if (m) return answers[m[1]] === m[2];
     } catch (err) {
       console.warn('Invalid Visible If:', condRaw);
     }
@@ -146,8 +139,8 @@ function FormComponent() {
   return e('div', {},
     switcher,
     e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
-      visibleBlocks.map(b =>
-        e(React.Fragment, { key: b.key },
+      visibleBlocks.map((b, idx) =>
+        e(React.Fragment, { key: b.key || `block-${idx}` },
           renderQuestion(
             b,
             answers[b.key] || (b.type === 'checkbox' ? [] : ''),
@@ -164,3 +157,6 @@ function FormComponent() {
     )
   );
 }
+
+// In src/app.js or index.html:
+// ReactDOM.render(React.createElement(FormComponent), document.getElementById('nimbo-form'));
