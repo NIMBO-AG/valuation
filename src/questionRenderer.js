@@ -88,8 +88,11 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
       );
 
     case 'country':
+      // Wir laden immer die DE-Liste, exportieren auch DE-Namen.
       const list = COUNTRIES.de;
-      const placeholder = lang === 'de' ? 'Bitte wählen' : 'Please select';
+      // Placeholder-Text übersetzbar über Key "country.placeholder"
+      const placeholder = translations['country.placeholder']
+        || (lang === 'de' ? 'Bitte wählen' : 'Please select');
       return e('div', { key: q.key },
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('select', {
@@ -98,9 +101,11 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           className: 'w-full border rounded p-2'
         },
           e('option', { value: '', disabled: true }, placeholder),
-          list.map(c =>
-            e('option', { key: c.code, value: c.name }, c.name)
-          )
+          list.map(c => {
+            // Translation-Key z.B. "country.CH" oder "country.DE"
+            const display = translations[`country.${c.code}`] || c.name;
+            return e('option', { key: c.code, value: c.name }, display);
+          })
         )
       );
 
