@@ -1,7 +1,19 @@
-// src/form.js
-function FormComponent() {
+import React from 'react';
+import renderQuestion from './questionRenderer';
+import LanguageSwitcher from './languageSwitcher';
+import {
+  fetchTranslationsCached,
+  fetchBlocks,
+  fetchPrefill,
+  postAnswers,
+  getCountryCodeByIP,
+  generateUUID,
+  COUNTRIES
+} from './utils';
+
+export default function FormComponent() {
   const e = React.createElement;
-  const params = new URLSearchParams(window.location.search);
+  const params      = new URLSearchParams(window.location.search);
   const [lang, setLang]       = React.useState(params.get('lang') || 'de');
   const valuationId            = params.get('uid');
   const isSubmitted            = params.get('submitted') === 'true';
@@ -16,54 +28,57 @@ function FormComponent() {
   const uuidRef                         = React.useRef(valuationId || null);
 
   React.useEffect(() => {
-    Promise.all([fetchTranslationsCached(), fetchBlocks()])
-      .then(async ([transData, blockData]) => {
-        setTranslations(transData[lang] || {});
-        setBlocks(blockData);
+    Promise.all([
+      fetchTranslationsCached(),
+      fetchBlocks()
+    ]).then(async ([transData, blockData]) => {
+      setTranslations(transData[lang] || {});
+      setBlocks(blockData);
 
-        if (valuationId && !isSubmitted) {
-          // Prefill im Update-Mode
-          fetchPrefill(valuationId, data => {
-            const incoming = data.answers || {};
-            const norm = {};
-            Object.keys(incoming).forEach(key => {
-              const val = incoming[key];
-              norm[key] = (typeof val === 'string' && val.includes(','))
-                ? val.split(/\s*,\s*/)
-                : val;
-            });
-            setAnswers(norm);
-            setLoading(false);
+      if (valuationId && !isSubmitted) {
+        fetchPrefill(valuationId, data => {
+          const inc = data.answers || {};
+          const norm = {};
+          Object.keys(inc).forEach(key => {
+            const v = inc[key];
+            norm[key] = typeof v === 'string' && v.includes(',')
+              ? v.split(/\s*,\s*/)
+              : v;
           });
-        } else {
-          // Neues Formular
-          uuidRef.current = generateUUID();
-          // Geo-IP default Country
-          const countryBlock = blockData.find(b => b.type === 'country');
-          if (countryBlock) {
-            getCountryCodeByIP()
-              .then(iso2 => {
-                if (!iso2) return;
-                const list = COUNTRIES[lang] || COUNTRIES['en'];
-                const match = list.find(c => c.code === iso2);
-                if (match) {
-                  setAnswers(prev => ({
-                    ...prev,
-                    [countryBlock.key]: match.code
-                  }));
-                }
-              })
-              .catch(() => {});
-          }
+          setAnswers(norm);
           setLoading(false);
+        });
+      } else {
+        uuidRef.current = generateUUID();
+        const countryBlock = blockData.find(
+          b => b.type === 'country'
+        );
+        if (countryBlock) {
+          getCountryCodeByIP()
+            .then(iso2 => {
+              if (!iso2) return;
+              const list = COUNTRIES[lang] || COUNTRIES.en;
+              const m = list.find(c => c.code === iso2);
+              if (m) {
+                setAnswers(prev => ({
+                  ...prev,
+                  [countryBlock.key]: m.code
+                }));
+              }
+            })
+            .catch(() => {});
         }
-      });
+        setLoading(false);
+      }
+    });
   }, [lang]);
 
   const handleSubmit = eEvt => {
     eEvt.preventDefault();
     const myValId = uuidRef.current;
-    const link    = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
+    const link    = `${window.location.origin}${
+      window.location.pathname
+    }?uid=${myValId}`;
     const payload = {
       uuid:       myValId,
       lang,
@@ -83,24 +98,44 @@ function FormComponent() {
   };
 
   if (loading) {
-    return e('p', {}, translations.loading || 'Lade…');
+    return e(
+      'p',
+      {},
+      translations.loading || 'Lade…'
+    );
   }
 
   if (isSubmitted) {
-    return e('div', { className: 'text-center' },
+    return e(
+      'div',
+      { className: 'text-center' },
       e(LanguageSwitcher, {
         currentLang: lang,
         onChange: newLang => {
           params.set('lang', newLang);
-          window.history.replaceState(null, '', '?' + params.toString());
+          window.history.replaceState(
+            null,
+            '',
+            '?' + params.toString()
+          );
           setLang(newLang);
         }
       }),
       e('p', {}, translations.thankYou),
-      e('a', {
-        href: window.location.href.replace('&submitted=true', ''),
-        className: 'text-blue-600 underline'
-      }, window.location.href.replace('&submitted=true', ''))
+      e(
+        'a',
+        {
+          href: window.location.href.replace(
+            '&submitted=true',
+            ''
+          ),
+          className: 'text-blue-600 underline'
+        },
+        window.location.href.replace(
+          '&submitted=true',
+          ''
+        )
+      )
     );
   }
 
@@ -108,12 +143,16 @@ function FormComponent() {
     currentLang: lang,
     onChange: newLang => {
       params.set('lang', newLang);
-      window.history.replaceState(null, '', '?' + params.toString());
+      window.history.replaceState(
+        null,
+        '',
+        '?' + params.toString()
+      );
       setLang(newLang);
     }
   });
 
-  // Filter: nur Blocks mit non-empty key und nach Update/Free Mode und Visible If
+  // Filter: nur Blocks mit key + Update/Free/Visible If
   const visibleBlocks = blocks
     .filter(b => b.key && b.key.trim())
     .filter(b => {
@@ -132,7 +171,9 @@ function FormComponent() {
       const condRaw = b['Visible If'];
       if (!condRaw) return true;
       try {
-        const m = condRaw.trim().match(/^(\w+)\s*==\s*"(.+)"$/);
+        const m = condRaw
+          .trim()
+          .match(/^(\w+)\s*==\s*"(.+)"$/);
         if (m) return answers[m[1]] === m[2];
       } catch (err) {
         console.warn('Invalid Visible If:', condRaw);
@@ -140,27 +181,41 @@ function FormComponent() {
       return true;
     });
 
-  return e('div', {},
+  return e(
+    'div',
+    {},
     switcher,
-    e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
+    e(
+      'form',
+      { onSubmit: handleSubmit, className: 'space-y-4' },
       visibleBlocks.map((b, idx) =>
-        e(React.Fragment, { key: b.key || `block-${idx}` },
+        e(
+          React.Fragment,
+          { key: b.key || `block-${idx}` },
           renderQuestion(
             b,
-            answers[b.key] || (b.type === 'checkbox' ? [] : ''),
-            val => setAnswers({ ...answers, [b.key]: val }),
+            answers[b.key] ||
+              (b.type === 'checkbox' ? [] : ''),
+            v =>
+              setAnswers({
+                ...answers,
+                [b.key]: v
+              }),
             translations,
-            lang
+            lang,
+            answers
           )
         )
       ),
-      e('button', {
-        type: 'submit',
-        className: 'bg-blue-600 text-white px-4 py-2 rounded'
-      }, translations.submit)
+      e(
+        'button',
+        {
+          type: 'submit',
+          className:
+            'bg-blue-600 text-white px-4 py-2 rounded'
+        },
+        translations.submit
+      )
     )
   );
 }
-
-// In src/app.js oder index.html:
-// ReactDOM.render(React.createElement(FormComponent), document.getElementById('nimbo-form'));
