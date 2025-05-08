@@ -4,6 +4,12 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
   const labelText = translations[q.id] || q.text;
 
   switch (q.type) {
+    case 'text':
+      // reiner Text-Block ohne Eingabe
+      return e('div', { className: 'mb-4' },
+        e('p', {}, q.text)
+      );
+
     case 'select':
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
@@ -17,15 +23,14 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           )
         )
       );
+
     case 'radio':
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         q.options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
-              type: 'radio',
-              name: q.id,
-              value: opt,
+              type: 'radio', name: q.id, value: opt,
               checked: answer === opt,
               onChange: () => onAnswer(opt),
               className: 'mr-2'
@@ -34,17 +39,16 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           )
         )
       );
+
     case 'checkbox':
-      const values = Array.isArray(answer) ?
-        answer : (answer ? answer.toString().split(/,\s*/) : []);
+      const values = Array.isArray(answer)
+        ? answer : (answer ? answer.toString().split(/,\s*/) : []);
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         q.options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
-              type: 'checkbox',
-              name: q.id,
-              value: opt,
+              type: 'checkbox', name: q.id, value: opt,
               checked: values.includes(opt),
               onChange: ev => {
                 let newVals = [...values];
@@ -58,18 +62,19 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           )
         )
       );
+
     case 'number':
       const formatted = formatNumber(answer);
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
-          type: 'text',
-          inputMode: 'numeric',
+          type: 'text', inputMode: 'numeric',
           value: formatted,
           onChange: ev => onAnswer(parseNumber(ev.target.value)),
           className: 'w-full border rounded p-2'
         })
       );
+
     case 'country':
       const list = COUNTRIES.de;
       const placeholder = lang === 'de' ? 'Bitte wählen' : 'Please select';
@@ -86,12 +91,12 @@ function renderQuestion(q, answer, onAnswer, translations, lang) {
           )
         )
       );
+
     default:
       return e('div', {},
         e('label', { className: 'block font-medium mb-1' }, labelText),
         e('input', {
-          type: 'text',
-          value: answer,
+          type: 'text', value: answer,
           onChange: ev => onAnswer(ev.target.value),
           className: 'w-full border rounded p-2'
         })
