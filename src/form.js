@@ -4,13 +4,16 @@ function FormComponent() {
   const params = new URLSearchParams(window.location.search);
   const [lang, setLang] = React.useState(params.get('lang') || 'de');
   const valuationId = params.get('uid');
-  const isSubmitted = params.get('submitted') === 'true';
+  const isSubmitted = params.get('submitted') === 'true');
+  const freeCode = params.get('free_code') || '';
+  const updateMode = Boolean(valuationId);
+  const freeMode   = freeCode && freeCode !== '-';
 
-  const [blocks, setBlocks] = React.useState([]);
+  const [blocks, setBlocks]       = React.useState([]);
   const [translations, setTranslations] = React.useState({});
-  const [answers, setAnswers] = React.useState({});
-  const [loading, setLoading] = React.useState(true);
-  const uuidRef = React.useRef(valuationId || null);
+  const [answers, setAnswers]     = React.useState({});
+  const [loading, setLoading]     = React.useState(true);
+  const uuidRef                   = React.useRef(valuationId || null);
 
   React.useEffect(() => {
     Promise.all([fetchTranslationsCached(), fetchBlocks()])
@@ -19,19 +22,24 @@ function FormComponent() {
         setBlocks(blockData);
 
         if (valuationId && !isSubmitted) {
+          // Prefill im Update-Mode
           fetchPrefill(valuationId, data => {
             const incoming = data.answers || {};
             const norm = {};
             Object.keys(incoming).forEach(key => {
               const val = incoming[key];
-              norm[key] = (typeof val === 'string' && val.includes(',')) ? val.split(/\s*,\s*/) : val;
+              norm[key] = (typeof val === 'string' && val.includes(',')) 
+                ? val.split(/\s*,\s*/) 
+                : val;
             });
             setAnswers(norm);
             setLoading(false);
           });
         } else {
+          // Neues Formular
           uuidRef.current = generateUUID();
-          const countryBlock = blockData.find(q => q.type === 'country');
+          // Geo-IP default Country
+          const countryBlock = blockData.find(b => b.type==='country');
           if (countryBlock) {
             try {
               const iso2 = await getCountryCodeByIP();
@@ -52,77 +60,93 @@ function FormComponent() {
   const handleSubmit = eEvt => {
     eEvt.preventDefault();
     const myValId = uuidRef.current;
-    const link = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
-    const payload = { uuid: myValId, lang, link, answers };
+    const link    = `${window.location.origin}${window.location.pathname}?uid=${myValId}`;
+    const payload = {
+      uuid: myValId,
+      lang,
+      link,
+      freeCode,
+      updateMode: updateMode ? 'yes' : 'no',
+      freeMode:   freeMode   ? 'yes' : 'no',
+      answers
+    };
     setLoading(true);
     postAnswers(payload, () => {
-window.location.search = `?uid=${myValId}&lang=${lang}&submitted=true`;
+      // URL anpassen
+      params.set('uid', myValId);
+      params.set('submitted', 'true');
+      if (freeCode) params.set('free_code', freeCode);
+      window.location.search = '?' + params.toString();
     });
   };
 
   if (loading) return e('p', {}, translations.loading || 'Lade…');
 
   if (isSubmitted) {
-    return e('div', { className: 'text-center' },
-      e(LanguageSwitcher, {
+    return e('div',{className:'text-center'},
+      e(LanguageSwitcher,{
         currentLang: lang,
-        onChange: newLang => {
-          params.set('lang', newLang);
-          window.history.replaceState(null, '', '?' + params.toString());
-          setLang(newLang);
-        }
+        onChange: nl => { params.set('lang', nl); window.history.replaceState(null,'','?'+params.toString()); setLang(nl); }
       }),
-      e('p', {}, translations.thankYou),
-      e('a', {
-        href: window.location.href.replace('&submitted=true',''),
-        className: 'text-blue-600 underline'
-      }, window.location.href.replace('&submitted=true',''))
+      e('p',{}, translations.thankYou),
+      e('a',{href:window.location.href.replace('&submitted=true',''), className:'text-blue-600 underline'},
+        window.location.href.replace('&submitted=true','')
+      )
     );
   }
 
-  const switcher = e(LanguageSwitcher, {
+  const switcher = e(LanguageSwitcher,{
     currentLang: lang,
-    onChange: newLang => {
-      params.set('lang', newLang);
-      window.history.replaceState(null, '', '?' + params.toString());
-      setLang(newLang);
-    }
+    onChange: nl => { params.set('lang', nl); window.history.replaceState(null,'','?'+params.toString()); setLang(nl); }
   });
 
-  const visibleBlocks = blocks.filter(q => {
-    if (!q.visible_if) return true;
+  // Sichtbarkeits-Filter
+  const visibleBlocks = blocks.filter(b => {
+    // Update-Mode Regeln
+    const um = b['Update Mode'] || '';
+    if (updateMode) {
+      if (um === 'hide in update mode') return false;
+    } else {
+      if (um === 'only in update mode') return false;
+    }
+    // Free-Mode Regeln
+    const fm = b['Free Mode'] || '';
+    if (freeMode) {
+      if (fm === 'hide in free mode') return false;
+    } else {
+      if (fm === 'only in free mode') return false;
+    }
+    // visible_if wie gehabt
+    if (!b.visible_if) return true;
     try {
-      const cond = q.visible_if.trim();
-      const match = cond.match(/^(\w+)\s*==\s*"(.+)"$/);
-      if (match) {
-        const field = match[1];
-        const value = match[2];
-        return answers[field] === value;
+      const cond = b.visible_if.trim();
+      const m = cond.match(/^(\w+)\s*==\s*"(.+)"$/);
+      if (m) {
+        return answers[m[1]] === m[2];
       }
-    } catch (err) {
-      console.warn("Invalid visible_if condition:", q.visible_if);
+    } catch(err) {
+      console.warn('Invalid visible_if:', b.visible_if);
     }
     return true;
   });
 
-  return e('div', {},
+  return e('div',{},
     switcher,
-    e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
-      visibleBlocks.map(q =>
-        e(React.Fragment, { key: q.id },
+    e('form',{onSubmit:handleSubmit,className:'space-y-4'},
+      visibleBlocks.map(b=>
+        e(React.Fragment,{key:b.id},
           renderQuestion(
-            q,
-            answers[q.id] || (q.type === 'checkbox' ? [] : ''),
-            val => setAnswers({ ...answers, [q.id]: val }),
+            b,
+            answers[b.id]|| (b.type==='checkbox'?[]:''),
+            v=> setAnswers({...answers,[b.id]:v}),
             translations,
             lang
           )
         )
       ),
-      e('button', {
-        type: 'submit',
-        className: 'bg-blue-600 text-white px-4 py-2 rounded'
-      }, translations.submit)
+      e('button',{type:'submit',className:'bg-blue-600 text-white px-4 py-2 rounded'},
+        translations.submit
+      )
     )
   );
 }
