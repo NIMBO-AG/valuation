@@ -6,7 +6,7 @@ function renderQuestion(
   onAnswer,
   translations,
   lang,
-  answers = {}        // Default, damit answers nie undefined ist
+  answers = {}       // Default, damit answers nie undefined ist
 ) {
   const e = React.createElement;
   const labelText = translations[q.key] || q.text || '';
@@ -117,10 +117,7 @@ function renderQuestion(
       );
 
     case 'region':
-      // Nutzt jetzt die ausgelagerte, global registrierte Komponente.
-      return e(window.RegionSelect, {
-        q, answer, onAnswer, translations, lang, answers
-      });
+      return e(window.RegionSelect, { q, answer, onAnswer, translations, lang, answers });
 
     default:
       return e('div', {},
@@ -135,5 +132,4 @@ function renderQuestion(
   }
 }
 
-// Global verfügbar machen
 window.renderQuestion = renderQuestion;
