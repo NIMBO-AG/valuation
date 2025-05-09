@@ -38,21 +38,17 @@ const regionData = {
   ]
 };
 
-/**
- * Renders only the <select> control for regions.
- * The questionRenderer is responsible for rendering the label and wrapper.
- */
 function RegionSelect({ q, answer, onAnswer, translations, lang, answers }) {
+  const e = React.createElement;
   const countryVal = answers['Hauptsitz der Firma'] || '';
   const options    = regionData[countryVal] || [];
 
-  // nichts anzeigen, wenn keine Regionen vorhanden
+  // wenn keine Regionen, geben wir null zurück
   if (!options.length) return null;
 
   const placeholder = translations['region.placeholder']
     || (lang === 'de' ? 'Bitte wählen' : 'Please select');
 
-  const e = React.createElement;
   return e('select', {
       id: q.key,
       value: answer || '',
@@ -66,5 +62,6 @@ function RegionSelect({ q, answer, onAnswer, translations, lang, answers }) {
   );
 }
 
-// global registrieren
+// global registrieren und Daten exportieren
 window.RegionSelect = RegionSelect;
+window.regionData   = regionData;
