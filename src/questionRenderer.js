@@ -11,11 +11,11 @@ function renderQuestion(
 ) {
   const e = React.createElement;
 
-  // 1) Question text + optional instructions
+  // 1) Grab the raw text + optional instructions from your sheet
   const labelText        = translations[q.key] || q.text || '';
   const instructionsText = q.instructions || '';
 
-  // 2) Helper: render label + instructions
+  // 2) Helper to emit the label + instructions
   function renderLabelAndInstructions() {
     const parts = [
       e('label', {
@@ -35,22 +35,22 @@ function renderQuestion(
     return parts;
   }
 
-  // 3) Pre-split options for select / radio / checkbox
+  // 3) Pre-split any options for select/radio/checkbox
   const optsKey = `${q.key} | Options`;
   const raw     = translations[optsKey] || (q.options || []).join(';');
   const options = raw.split(';').filter(o => o);
 
+  // 4) Now handle each type
   switch (q.type) {
-
     // ─── informational paragraph ─────────────────────────────────────────
     case 'text':
       return e('div', { className: 'mb-4' },
         e('p', {}, labelText)
       );
 
-    // ─── single‐line text input ───────────────────────────────────────────
+    // ─── text input ───────────────────────────────────────────────────────
     case 'input':
-      return e('div', { className: 'mb-4' },
+      return e('div',{ className:'mb-4' },
         ...renderLabelAndInstructions(),
         e('input', {
           id:        q.key,
@@ -62,9 +62,9 @@ function renderQuestion(
         })
       );
 
-    // ─── dropdown select ─────────────────────────────────────────────────
+    // ─── select ────────────────────────────────────────────────────────────
     case 'select':
-      return e('div', { className: 'mb-4' },
+      return e('div',{ className:'mb-4' },
         ...renderLabelAndInstructions(),
         e('select', {
           id:       q.key,
@@ -76,14 +76,14 @@ function renderQuestion(
             translations[`${q.key}.placeholder`] || '— bitte wählen —'
           ),
           options.map(opt =>
-            e('option',{key:opt,value:opt},opt)
+            e('option',{ key:opt, value:opt }, opt)
           )
         )
       );
 
-    // ─── radio buttons ───────────────────────────────────────────────────
+    // ─── radio ─────────────────────────────────────────────────────────────
     case 'radio':
-      return e('div', { className: 'mb-4' },
+      return e('div',{ className:'mb-4' },
         ...renderLabelAndInstructions(),
         options.map(opt =>
           e('div',{ key:opt, className:'flex items-center mb-1' },
@@ -91,16 +91,16 @@ function renderQuestion(
               type:     'radio',
               name:     q.key,
               value:    opt,
-              checked:  answer===opt,
-              onChange:()=>onAnswer(opt),
+              checked:  answer === opt,
+              onChange: ()=> onAnswer(opt),
               className:'mr-2'
             }),
-            e('label',{},opt)
+            e('label',{}, opt)
           )
         )
       );
 
-    // ─── checkboxes ───────────────────────────────────────────────────────
+    // ─── checkbox ─────────────────────────────────────────────────────────
     case 'checkbox':
       const vals = Array.isArray(answer)
         ? answer
@@ -114,41 +114,41 @@ function renderQuestion(
               name:    q.key,
               value:   opt,
               checked: vals.includes(opt),
-              onChange:ev=>{
+              onChange: ev => {
                 const next = ev.target.checked
-                  ? [...vals,opt]
-                  : vals.filter(v=>v!==opt);
+                  ? [...vals, opt]
+                  : vals.filter(v => v !== opt);
                 onAnswer(next);
               },
               className:'mr-2'
             }),
-            e('label',{},opt)
+            e('label',{}, opt)
           )
         )
       );
 
-    // ─── numeric input ────────────────────────────────────────────────────
+    // ─── number ───────────────────────────────────────────────────────────
     case 'number':
       const formatted = formatNumber(answer);
       return e('div',{ className:'mb-4' },
         ...renderLabelAndInstructions(),
         e('input',{
-          id:        q.key,
-          type:      'text',
-          inputMode: 'numeric',
-          value:     formatted,
-          onChange:  ev=>onAnswer(parseNumber(ev.target.value)),
-          className: 'w-full border rounded p-2'
+          id:       q.key,
+          type:     'text',
+          inputMode:'numeric',
+          value:    formatted,
+          onChange: ev => onAnswer(parseNumber(ev.target.value)),
+          className:'w-full border rounded p-2'
         })
       );
 
-    // ─── country dropdown ─────────────────────────────────────────────────
+    // ─── country ──────────────────────────────────────────────────────────
     case 'country': {
       const list   = COUNTRIES.de;
       const sorted = list.slice().sort((a,b)=>{
         const A = translations[`country.${a.code}`]||a.name;
         const B = translations[`country.${b.code}`]||b.name;
-        return A.localeCompare(B,lang);
+        return A.localeCompare(B, lang);
       });
       const ph = translations['country.placeholder']
         || (lang==='de'?'Bitte wählen':'Please select');
@@ -160,8 +160,8 @@ function renderQuestion(
           onChange: ev=>onAnswer(ev.target.value),
           className:'w-full border rounded p-2'
         },
-          e('option',{value:'',disabled:true},ph),
-          sorted.map(c=>
+          e('option',{ value:'', disabled:true }, ph),
+          sorted.map(c =>
             e('option',{ key:c.code, value:c.code },
               translations[`country.${c.code}`]||c.name
             )
@@ -171,46 +171,50 @@ function renderQuestion(
     }
 
     // ─── region ───────────────────────────────────────────────────────────
-    case 'region':
-      // delegate entirely to RegionSelect; it returns null when no data => no wrapper
-      return e(window.RegionSelect, {
-        q,
-        answer,
-        onAnswer,
-        translations,
-        lang,
-        answers
+    case 'region': {
+      // 1) call the component function directly, not via createElement
+      const regionElem = window.RegionSelect({
+        q, answer, onAnswer, translations, lang, answers
       });
+      // 2) if it is null/undefined, hide entire block
+      if (!regionElem) return null;
+      // 3) otherwise wrap with label + instructions
+      return e('div',{ className:'mb-4' },
+        ...renderLabelAndInstructions(),
+        regionElem
+      );
+    }
 
     // ─── industries ───────────────────────────────────────────────────────
-    case 'industries':
-      // delegate entirely; returns null when hidden
-      return e(window.IndustrySelect, {
-        q,
-        answer,
-        onAnswer,
-        translations,
-        lang,
-        answers,
-        industries
+    case 'industries': {
+      const indElem = window.IndustrySelect({
+        q, answer, onAnswer, translations, lang, answers, industries
       });
+      if (!indElem) return null;
+      return e('div',{ className:'mb-4' },
+        ...renderLabelAndInstructions(),
+        indElem
+      );
+    }
 
-    // ─── stars rating ─────────────────────────────────────────────────────
+    // ─── stars ─────────────────────────────────────────────────────────────
     case 'stars':
       return e('div',{ className:'mb-4' },
         ...renderLabelAndInstructions(),
         e('div',{ className:'flex space-x-1' },
-          [1,2,3,4,5].map(n=>
+          [1,2,3,4,5].map(n =>
             e('span',{
               key: n,
-              className:`cursor-pointer text-2xl ${answer>=n?'text-yellow-400':'text-gray-300'}`,
+              className:`cursor-pointer text-2xl ${
+                answer>=n?'text-yellow-400':'text-gray-300'
+              }`,
               onClick:()=>onAnswer(n)
             }, answer>=n?'★':'☆')
           )
         )
       );
 
-    // ─── fallback to text input ───────────────────────────────────────────
+    // ─── fallback (text input) ────────────────────────────────────────────
     default:
       return e('div',{ className:'mb-4' },
         ...renderLabelAndInstructions(),
