@@ -120,16 +120,16 @@ function renderQuestion(
     case 'region':
       return e(window.RegionSelect, { q, answer, onAnswer, translations, lang, answers });
 
-    case 'industries':
-      return e(window.IndustrySelect, {
-        q,
-        answer,
-        onAnswer,
-        translations,
-        lang,
-        answers,
-        industries
-      });
+   case 'industries':
+  return e(window.IndustrySelect, {
+    q,
+    answer,
+    onAnswer,
+    translations,
+    lang,
+    answers,
+    industries   // aus FormComponent übergeben
+  });
 
     default:
       return e('div', {},
