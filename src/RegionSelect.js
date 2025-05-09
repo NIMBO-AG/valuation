@@ -1,9 +1,6 @@
 // src/RegionSelect.js
 
-/**
- * Hard-coded Liste der Regionen pro Land.
- * Country-Codes wie im CountrySelect: DE, AT, IT, US, UK
- */
+// Hard-coded Regionendaten
 const regionData = {
   DE: [
     "Baden-Württemberg","Bayern","Berlin","Brandenburg","Bremen",
@@ -39,44 +36,28 @@ const regionData = {
   ]
 };
 
-/**
- * RegionSelect-Komponente analog zu CountrySelect
- * Props erwartet:
- *  - q: Block-Definition (mit q.id, q.text)
- *  - answer: aktueller Wert
- *  - onAnswer: Callback (neuer Wert)
- *  - translations: Übersetzungsobjekt
- *  - lang: aktuelle Sprache
- *  - answers: alle bisherigen Antworten (für country)
- */
 function RegionSelect({ q, answer, onAnswer, translations, lang, answers }) {
-  // Landsschlüssel muss mit deinem CountrySelect übereinstimmen
-  const country = answers['country'] || "";
+  const e = React.createElement;
+  const country = answers['country'] || '';
   const options = regionData[country] || [];
 
-  // React.createElement shorthand
-  const e = React.createElement;
+  const placeholder = translations['region.placeholder']
+    || (lang === 'de' ? 'Bitte wählen' : 'Please select');
 
   return e('div', { className: 'mb-4' },
-    e('label',
-      { className: 'block font-medium mb-1', htmlFor: q.id },
-      translations[q.id] || q.text
+    e('label', { className: 'block font-medium mb-1', htmlFor: q.key },
+      translations[q.key] || q.text
     ),
-    e('select',
-      {
-        id: q.id,
-        value: answer || "",
-        onChange: ev => onAnswer(ev.target.value),
-        className: 'w-full border rounded p-2'
-      },
-      // erste leere Option
-      e('option', { key: '', value: '' }, '— bitte wählen —'),
-      // alle Regions-Optionen
+    e('select', {
+      id: q.key,
+      value: answer || '',
+      onChange: ev => onAnswer(ev.target.value),
+      className: 'w-full border rounded p-2'
+    },
+      e('option', { value: '', disabled: true }, placeholder),
       options.map(region =>
         e('option', { key: region, value: region }, region)
       )
     )
   );
 }
-
-export { RegionSelect };
