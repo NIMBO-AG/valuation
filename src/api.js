@@ -1,26 +1,27 @@
 // src/api.js
 
-// Endpunkte aus config.js
-// const BLOCKS_URL      = YOUR_BLOCKS_URL;
-// const TRANSLATIONS_URL= YOUR_TRANSLATIONS_URL;
-// const PREFILL_URL     = YOUR_PREFILL_URL;
-// const WEBHOOK_URL     = YOUR_WEBHOOK_URL;
-// const SCRIPT_URL      = YOUR_APPSCRIPT_URL;
+// Blocks-/Translation-/Prefill-/Webhook-URLs sollten in config.js stehen
+// und dort als globale Variablen definiert werden, z.B.:
+//   window.BLOCKS_URL = 'https://...';
+//   window.TRANSLATIONS_URL = 'https://...';
+//   window.PREFILL_URL = 'https://...';
+//   window.WEBHOOK_URL = 'https://...';
+//   window.SCRIPT_URL = 'https://script.google.com/.../exec';
 
 function fetchBlocks() {
-  return fetch(BLOCKS_URL).then(res => res.json());
+  return fetch(window.BLOCKS_URL).then(res => res.json());
 }
 
 function fetchTranslationsCached() {
-  return loadTranslations(); // Caching-Logik in translations.js
+  return loadTranslations(); // caching in translations.js
 }
 
 function fetchPrefill(uid, callback) {
-  loadPrefill(uid, callback); // Prefill-Logik in prefill.js
+  loadPrefill(uid, callback); // in prefill.js
 }
 
 function postAnswers(payload, callback) {
-  fetch(WEBHOOK_URL, {
+  fetch(window.WEBHOOK_URL, {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'application/json' },
@@ -30,8 +31,13 @@ function postAnswers(payload, callback) {
 
 let _cacheIndustries = null;
 function fetchIndustriesCached() {
+  const scriptUrl = window.SCRIPT_URL;
+  if (!scriptUrl) {
+    console.error('fetchIndustriesCached: window.SCRIPT_URL is not defined');
+    return Promise.resolve([]);
+  }
   if (_cacheIndustries) return Promise.resolve(_cacheIndustries);
-  return fetch(`${SCRIPT_URL}?industries=true`)
+  return fetch(`${scriptUrl}?industries=true`)
     .then(res => res.json())
     .then(data => {
       _cacheIndustries = data;
@@ -40,8 +46,8 @@ function fetchIndustriesCached() {
 }
 
 // Globale Registrierung
-window.fetchBlocks                = fetchBlocks;
-window.fetchTranslationsCached    = fetchTranslationsCached;
-window.fetchPrefill               = fetchPrefill;
-window.postAnswers                = postAnswers;
-window.fetchIndustriesCached      = fetchIndustriesCached;
+window.fetchBlocks             = fetchBlocks;
+window.fetchTranslationsCached = fetchTranslationsCached;
+window.fetchPrefill            = fetchPrefill;
+window.postAnswers             = postAnswers;
+window.fetchIndustriesCached   = fetchIndustriesCached;
