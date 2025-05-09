@@ -20,3 +20,14 @@ function postAnswers(payload, callback) {
     body: JSON.stringify(payload)
   }).finally(callback);
 }
+
+let _cacheIndustries = null;
+export function fetchIndustriesCached() {
+  if (_cacheIndustries) return Promise.resolve(_cacheIndustries);
+  return fetch(`${SCRIPT_URL}?industries=true`)
+    .then(res => res.json())
+    .then(data => {
+      _cacheIndustries = data;
+      return data;
+    });
+}
