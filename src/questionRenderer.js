@@ -8,9 +8,11 @@ function renderQuestion(
   lang,
   answers = {},
   industries = [],
-  setAnswers         // NEW: setter for multi-key updates
+  setAnswers   // needed for radio-other
 ) {
   const e = React.createElement;
+
+  // Question text + optional instructions
   const labelText        = translations[q.key] || q.text || '';
   const instructionsText = q.instructions || '';
 
@@ -33,98 +35,221 @@ function renderQuestion(
     return parts;
   }
 
-  // split options
-  const rawOpts = translations[`${q.key} | Options`] 
+  // Pre-split options for select/radio/checkbox
+  const optsRaw = translations[`${q.key} | Options`] 
     || (q.options || []).join(';');
-  const options = rawOpts.split(';').filter(o => o);
+  const options = optsRaw.split(';').filter(o => o);
 
   switch (q.type) {
 
-    // ... your existing cases for text, input, select, radio, checkbox, etc. ...
+    // informational paragraph
+    case 'text':
+      return e('div', { className: 'mb-4' },
+        e('p', {}, labelText)
+      );
 
-    // ─── radio-with-other ───────────────────────────────────────────────
-    case 'radio-other': {
-      // assume last option is the "Other" label
-      const otherOption = options[options.length - 1];
-      const normalOptions = options.slice(0, -1);
-      // value of the free-text field is stored at key+"_other"
-      const otherKey = `${q.key}_other`;
-      const otherValue = answers[otherKey] || '';
-
+    // single-line text input
+    case 'input':
       return e('div', { className: 'mb-4' },
         ...renderLabelAndInstructions(),
-        // render the normal radio choices
-        normalOptions.map(opt =>
+        e('input', {
+          id:        q.key,
+          type:      'text',
+          value:     answer || '',
+          maxLength: 500,
+          onChange:  ev => onAnswer(ev.target.value),
+          className: 'w-full border rounded p-2'
+        })
+      );
+
+    // dropdown select
+    case 'select':
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e('select', {
+          id:       q.key,
+          value:    answer || '',
+          onChange: ev => onAnswer(ev.target.value),
+          className:'w-full border rounded p-2'
+        },
+          e('option', { value: '', disabled: true },
+            translations[`${q.key}.placeholder`] || '— bitte wählen —'
+          ),
+          options.map(opt =>
+            e('option', { key: opt, value: opt }, opt)
+          )
+        )
+      );
+
+    // radio buttons
+    case 'radio':
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
-              type: 'radio',
-              name: q.key,
-              value: opt,
-              checked: answer === opt,
-              onChange: () => {
-                // set main answer and clear any previous "other"
-                setAnswers({
-                  ...answers,
-                  [q.key]: opt,
-                  [otherKey]: ''
-                });
-              },
-              className: 'mr-2'
+              type:     'radio',
+              name:     q.key,
+              value:    opt,
+              checked:  answer === opt,
+              onChange: () => onAnswer(opt),
+              className:'mr-2'
             }),
             e('label', {}, opt)
           )
-        ),
-        // render the "Other" radio
-        e('div', { key: otherOption, className: 'flex items-center mb-1' },
-          e('input', {
-            type: 'radio',
-            name: q.key,
-            value: otherOption,
-            checked: answer === otherOption,
-            onChange: () => {
-              // select "Other" and clear previous free-text
-              setAnswers({
-                ...answers,
-                [q.key]: otherOption,
-                [otherKey]: ''
-              });
-            },
-            className: 'mr-2'
-          }),
-          e('label', {}, otherOption)
-        ),
-        // if "Other" is selected, show a text input
-        answer === otherOption
-          ? e('input', {
-              id: otherKey,
-              type: 'text',
-              placeholder: translations[`${q.key}.otherPlaceholder`]
-                || (lang === 'de' ? 'Bitte angeben…' : 'Please specify…'),
-              value: otherValue,
+        )
+      );
+
+    // checkboxes
+    case 'checkbox': {
+      const vals = Array.isArray(answer)
+        ? answer
+        : (answer ? answer.toString().split(/,\s*/) : []);
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        options.map(opt =>
+          e('div', { key: opt, className: 'flex items-center mb-1' },
+            e('input', {
+              type:     'checkbox',
+              name:     q.key,
+              value:    opt,
+              checked:  vals.includes(opt),
               onChange: ev => {
-                setAnswers({
-                  ...answers,
-                  [q.key]: otherOption,
-                  [otherKey]: ev.target.value
-                });
+                const next = ev.target.checked
+                  ? [...vals, opt]
+                  : vals.filter(v=>v!==opt);
+                onAnswer(next);
               },
-              className: 'w-full border rounded p-2 mt-1'
-            })
-          : null
+              className:'mr-2'
+            }),
+            e('label', {}, opt)
+          )
+        )
       );
     }
 
-    // ... your existing region, industries, stars, fallback cases ...
-    default:
-      // (keep your fallback text‐input case here)
+    // numeric input
+    case 'number': {
+      const formatted = formatNumber(answer);
       return e('div', { className: 'mb-4' },
         ...renderLabelAndInstructions(),
-        e('input',{
-          id: q.key,
-          type: 'text',
-          value: answer || '',
-          maxLength: 500,
+        e('input', {
+          id:        q.key,
+          type:      'text',
+          inputMode: 'numeric',
+          value:     formatted,
+          onChange:  ev => onAnswer(parseNumber(ev.target.value)),
+          className: 'w-full border rounded p-2'
+        })
+      );
+    }
+
+    // ------------- RESTORE COUNTRY DROPDOWN -------------
+    case 'country': {
+      const list   = COUNTRIES.de;
+      const sorted = list.slice().sort((a,b) => {
+        const A = translations[`country.${a.code}`] || a.name;
+        const B = translations[`country.${b.code}`] || b.name;
+        return A.localeCompare(B, lang);
+      });
+      const placeholder = translations['country.placeholder']
+        || (lang === 'de' ? 'Bitte wählen' : 'Please select');
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e('select', {
+          id:       q.key,
+          value:    answer || '',
           onChange: ev => onAnswer(ev.target.value),
+          className:'w-full border rounded p-2'
+        },
+          e('option', { value: '', disabled: true }, placeholder),
+          sorted.map(c =>
+            e('option', { key: c.code, value: c.code },
+              translations[`country.${c.code}`] || c.name
+            )
+          )
+        )
+      );
+    }
+
+    // region dropdown
+    case 'region':
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e(window.RegionSelect, { q, answer, onAnswer, translations, lang, answers })
+      );
+
+    // industries tree
+    case 'industries':
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e(window.IndustrySelect, { q, answer, onAnswer, translations, lang, answers, industries })
+      );
+
+    // radio-with-other
+    case 'radio-other': {
+      const otherOpt = options[options.length-1];
+      const normal  = options.slice(0, -1);
+      const otherKey = `${q.key}_other`;
+      const otherVal = answers[otherKey] || '';
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        normal.map(opt =>
+          e('div', { key: opt, className: 'flex items-center mb-1' },
+            e('input', {
+              type:'radio', name:q.key, value:opt,
+              checked: answer===opt,
+              onChange: ()=> setAnswers({ ...answers, [q.key]:opt, [otherKey]: '' }),
+              className:'mr-2'
+            }),
+            e('label',{},opt)
+          )
+        ),
+        e('div', { key: otherOpt, className:'flex items-center mb-1' },
+          e('input', {
+            type:'radio', name:q.key, value:otherOpt,
+            checked: answer===otherOpt,
+            onChange: ()=> setAnswers({ ...answers, [q.key]:otherOpt, [otherKey]: '' }),
+            className:'mr-2'
+          }),
+          e('label',{},otherOpt)
+        ),
+        answer===otherOpt && e('input',{
+          id: otherKey,
+          type:'text',
+          placeholder: translations[`${q.key}.otherPlaceholder`] || (lang==='de'?'Bitte angeben…':'Please specify…'),
+          value: otherVal,
+          onChange: ev=> setAnswers({ ...answers, [q.key]:otherOpt, [otherKey]:ev.target.value }),
+          className:'w-full border rounded p-2 mt-1'
+        })
+      );
+    }
+
+    // stars rating
+    case 'stars':
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e('div', { className:'flex space-x-1' },
+          [1,2,3,4,5].map(n =>
+            e('span', {
+              key: n,
+              className:`cursor-pointer text-2xl ${answer>=n?'text-yellow-400':'text-gray-300'}`,
+              onClick: ()=>onAnswer(n)
+            }, answer>=n?'★':'☆')
+          )
+        )
+      );
+
+    // fallback text input
+    default:
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e('input', {
+          id:        q.key,
+          type:      'text',
+          value:     answer || '',
+          maxLength: 500,
+          onChange:  ev => onAnswer(ev.target.value),
           className: 'w-full border rounded p-2'
         })
       );
