@@ -215,3 +215,13 @@ function FormComponent() {
 }
 
 window.FormComponent = FormComponent;
+
+// Vorschau bei Bedarf einfügen
+React.useEffect(() => {
+  const relevant = blocks.some(b => b.type && b.type.startsWith('fin'));
+  if (relevant && !document.querySelector('#pl-preview')) {
+    const html = window.renderPLPreview();
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+}, [blocks]);
+
