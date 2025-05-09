@@ -51,7 +51,7 @@ function FormComponent() {
     });
   }, []); // nur einmal
 
-  // 2) Translations neu laden bei lang‐Wechsel
+  // 2) Translations neu laden bei lang-Wechsel
   React.useEffect(() => {
     window.fetchTranslationsCached().then(transData => {
       setTranslations(transData[lang] || {});
@@ -106,32 +106,39 @@ function FormComponent() {
     });
   }
 
+  // Loading-Zustand
   if (loading) {
     return e('p', {}, translations.loading || 'Lade…');
   }
+
+  // Danke-Seite
   if (isSubmitted) {
-    return e('div',{ className:'text-center' },
+    return e('div', { className: 'text-center' },
       e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange }),
       e('p', {}, translations.thankYou),
-      e('a',{
-        href: window.location.href.replace('&submitted=true',''),
-        className:'text-blue-600 underline'
-      }, window.location.href.replace('&submitted=true',''))
+      e('a', {
+        href: window.location.href.replace('&submitted=true', ''),
+        className: 'text-blue-600 underline'
+      }, window.location.href.replace('&submitted=true', ''))
     );
   }
 
+  // Sprach-Switcher im Formular
   const switcher = e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange });
 
   // Blocks filtern (Update/Free/Visible If)
   const visibleBlocks = blocks
     .filter(b => b.key && b.key.trim())
     .filter(b => {
+      // Update Mode
       const um = b['Update Mode'] || '';
       if (updateMode && um === 'hide in update mode') return false;
       if (!updateMode && um === 'only in update mode') return false;
+      // Free Mode
       const fm = b['Free Mode'] || '';
       if (freeMode && fm === 'hide in free mode') return false;
       if (!freeMode && fm === 'only in free mode') return false;
+      // Visible If
       const cond = b['Visible If'];
       if (!cond) return true;
       try {
@@ -140,7 +147,7 @@ function FormComponent() {
       } catch {}
       return true;
     })
-    // ─── NEU: drop region‐Block, wenn keine Optionen existieren
+    // Region-Block nur, wenn es zu Country Daten gibt
     .filter(b => {
       if (b.type === 'region') {
         const country = answers['Hauptsitz der Firma'] || '';
@@ -148,9 +155,23 @@ function FormComponent() {
         return opts.length > 0;
       }
       return true;
+    })
+    // Industry Tags: nur anzeigen, wenn Block-Tags und Industry-Tags überlappen
+    .filter(b => {
+      const raw = b['Industry Tags'] || '';
+      if (!raw.trim()) return true;  // keine Tags → immer zeigen
+      const blockTags = raw.split(';').map(t => t.trim()).filter(t => t);
+      if (blockTags.length === 0) return true;
+
+      const sel = answers['Selected Industry'];
+      if (!sel) return false;
+      const industry = industries.find(i => i.code === sel);
+      if (!industry || !industry.tags) return false;
+      // industry.tags ist bereits ein Array
+      return blockTags.some(tag => industry.tags.includes(tag));
     });
 
-  // Rendern & Null‐Filter
+  // Rendern & Null-Filter
   const formElements = visibleBlocks
     .map((b, idx) => {
       const el = renderQuestion(
@@ -167,11 +188,11 @@ function FormComponent() {
     .filter(x => x);
 
   return e('div', {}, switcher,
-    e('form',{ onSubmit: handleSubmit, className:'space-y-4' },
+    e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
       ...formElements,
-      e('button',{
-        type:'submit',
-        className:'bg-blue-600 text-white px-4 py-2 rounded'
+      e('button', {
+        type: 'submit',
+        className: 'bg-blue-600 text-white px-4 py-2 rounded'
       }, translations.submit)
     )
   );
