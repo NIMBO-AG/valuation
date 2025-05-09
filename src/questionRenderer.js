@@ -159,6 +159,25 @@ function renderQuestion(
         })
       );
 
+      case 'stars':
+      // answer is a number 1–5
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e('div', { className: 'flex space-x-1' },
+          [1,2,3,4,5].map(n =>
+            e('span', {
+              key: n,
+              className: [
+                'cursor-pointer',
+                'text-2xl',
+                answer >= n ? 'text-yellow-400' : 'text-gray-300'
+              ].join(' '),
+              onClick: () => onAnswer(n)
+            }, answer >= n ? '★' : '☆')
+          )
+        )
+      );
+
     default:
       return e('div', { className: 'mb-4' },
         ...renderLabelAndInstructions(),
