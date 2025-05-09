@@ -34,7 +34,7 @@ function FormComponent() {
       if (valuationId && !isSubmitted) {
         window.fetchPrefill(valuationId, data => {
           const incoming = data.answers || {};
-          const norm     = {};
+          const norm = {};
           Object.keys(incoming).forEach(key => {
             const v = incoming[key];
             norm[key] = (typeof v === 'string' && v.includes(','))
@@ -126,7 +126,7 @@ function FormComponent() {
   // Sprach-Switcher
   const switcher = e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange });
 
-  // Hilfsfunktion: findet ein Leaf-Objekt mit .code === sel in der nested tree
+  // Hilfsfunktion: findet Leaf mit code === sel
   function findIndustryLeaf(nodes, sel) {
     for (const n of nodes) {
       if (n.code === sel) return n;
@@ -159,7 +159,7 @@ function FormComponent() {
       } catch {}
       return true;
     })
-    // Region nur wenn Daten vorhanden
+    // Region-Block nur, wenn Daten vorhanden
     .filter(b => {
       if (b.type === 'region') {
         const country = answers['Hauptsitz der Firma'] || '';
@@ -168,19 +168,16 @@ function FormComponent() {
       }
       return true;
     })
-    // Industry Tag–Logik
+    // Industry-Tag-Logik
     .filter(b => {
       const raw = b['Industry Tag'] || '';
       if (!raw.trim()) return true;
       const blockTags = raw.split(';').map(t => t.trim()).filter(t => t);
       if (blockTags.length === 0) return true;
-
       const sel = answers['Selected Industry'];
       if (!sel) return false;
-
       const leaf = findIndustryLeaf(industries, sel);
       if (!leaf || !leaf.tags) return false;
-
       return blockTags.some(tag => leaf.tags.includes(tag));
     });
 
@@ -194,7 +191,8 @@ function FormComponent() {
         translations,
         lang,
         answers,
-        industries
+        industries,
+        setAnswers             // <-- pass setter for radio-other
       );
       return el ? e(React.Fragment, { key: b.key || `blk-${idx}` }, el) : null;
     })
