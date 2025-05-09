@@ -6,29 +6,56 @@ function renderQuestion(
   onAnswer,
   translations,
   lang,
-  answers = {},       // Default, damit answers nie undefined ist
-  industries = []     // Default, damit industries nie undefined ist
+  answers = {},
+  industries = []
 ) {
   const e = React.createElement;
-  const labelText = translations[q.key] || q.text || '';
-  const optionsKey = `${q.key} | Options`;
-  const raw = translations[optionsKey] || (q.options || []).join(';');
-  const options = raw.split(';').filter(opt => opt !== '');
+
+  // Common values
+  const labelText        = translations[q.key] || q.text || '';
+  const instructionsText = q.instructions || '';
+  const optionsKey       = `${q.key} | Options`;
+  const raw              = translations[optionsKey] || (q.options || []).join(';');
+  const options          = raw.split(';').filter(opt => opt !== '');
+
+  // Helper to render label + optional instructions
+  function renderLabelAndInstructions() {
+    const children = [
+      e('label',
+        { className: 'block font-medium mb-1', htmlFor: q.key },
+        labelText
+      )
+    ];
+    if (instructionsText) {
+      children.push(
+        e('p',
+          { className: 'text-sm text-gray-600 mb-2' },
+          instructionsText
+        )
+      );
+    }
+    return children;
+  }
 
   switch (q.type) {
     case 'text':
       return e('div', { className: 'mb-4' },
-        e('p', {}, labelText)
+        ...renderLabelAndInstructions(),
+        e('p', {}, labelText) // text blocks just render the text
       );
 
     case 'select':
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
         e('select', {
-          value: answer,
+          id: q.key,
+          value: answer || '',
           onChange: ev => onAnswer(ev.target.value),
           className: 'w-full border rounded p-2'
         },
+          e('option', { value: '', disabled: true },
+            translations[`${q.key}.placeholder`] || '— bitte wählen —'
+          ),
           options.map(opt =>
             e('option', { key: opt, value: opt }, opt)
           )
@@ -36,8 +63,8 @@ function renderQuestion(
       );
 
     case 'radio':
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
         options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
@@ -57,8 +84,8 @@ function renderQuestion(
       const values = Array.isArray(answer)
         ? answer
         : (answer ? answer.toString().split(/,\s*/) : []);
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
         options.map(opt =>
           e('div', { key: opt, className: 'flex items-center mb-1' },
             e('input', {
@@ -81,8 +108,8 @@ function renderQuestion(
 
     case 'number':
       const formatted = formatNumber(answer);
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
         e('input', {
           type: 'text',
           inputMode: 'numeric',
@@ -95,15 +122,16 @@ function renderQuestion(
     case 'country':
       const list = COUNTRIES.de;
       const sortedList = list.slice().sort((a, b) => {
-        const labelA = translations[`country.${a.code}`] || a.name;
-        const labelB = translations[`country.${b.code}`] || b.name;
-        return labelA.localeCompare(labelB, lang);
+        const la = translations[`country.${a.code}`] || a.name;
+        const lb = translations[`country.${b.code}`] || b.name;
+        return la.localeCompare(lb, lang);
       });
       const placeholderC = translations['country.placeholder']
         || (lang === 'de' ? 'Bitte wählen' : 'Please select');
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
         e('select', {
+          id: q.key,
           value: answer || '',
           onChange: ev => onAnswer(ev.target.value),
           className: 'w-full border rounded p-2'
@@ -118,22 +146,22 @@ function renderQuestion(
       );
 
     case 'region':
-      return e(window.RegionSelect, { q, answer, onAnswer, translations, lang, answers });
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e(window.RegionSelect, { q, answer, onAnswer, translations, lang, answers })
+      );
 
-   case 'industries':
-  return e(window.IndustrySelect, {
-    q,
-    answer,
-    onAnswer,
-    translations,
-    lang,
-    answers,
-    industries   // aus FormComponent übergeben
-  });
+    case 'industries':
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e(window.IndustrySelect, {
+          q, answer, onAnswer, translations, lang, answers, industries
+        })
+      );
 
     default:
-      return e('div', {},
-        e('label', { className: 'block font-medium mb-1' }, labelText),
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
         e('input', {
           type: 'text',
           value: answer,
