@@ -1,15 +1,22 @@
 // src/api.js
+
+// Endpunkte aus config.js
+// const BLOCKS_URL      = YOUR_BLOCKS_URL;
+// const TRANSLATIONS_URL= YOUR_TRANSLATIONS_URL;
+// const PREFILL_URL     = YOUR_PREFILL_URL;
+// const WEBHOOK_URL     = YOUR_WEBHOOK_URL;
+// const SCRIPT_URL      = YOUR_APPSCRIPT_URL;
+
 function fetchBlocks() {
   return fetch(BLOCKS_URL).then(res => res.json());
 }
 
-
 function fetchTranslationsCached() {
-  return loadTranslations(); // uses caching in translations.js
+  return loadTranslations(); // Caching-Logik in translations.js
 }
 
 function fetchPrefill(uid, callback) {
-  loadPrefill(uid, callback);
+  loadPrefill(uid, callback); // Prefill-Logik in prefill.js
 }
 
 function postAnswers(payload, callback) {
@@ -22,7 +29,7 @@ function postAnswers(payload, callback) {
 }
 
 let _cacheIndustries = null;
-export function fetchIndustriesCached() {
+function fetchIndustriesCached() {
   if (_cacheIndustries) return Promise.resolve(_cacheIndustries);
   return fetch(`${SCRIPT_URL}?industries=true`)
     .then(res => res.json())
@@ -31,3 +38,10 @@ export function fetchIndustriesCached() {
       return data;
     });
 }
+
+// Globale Registrierung
+window.fetchBlocks                = fetchBlocks;
+window.fetchTranslationsCached    = fetchTranslationsCached;
+window.fetchPrefill               = fetchPrefill;
+window.postAnswers                = postAnswers;
+window.fetchIndustriesCached      = fetchIndustriesCached;
