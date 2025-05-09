@@ -44,7 +44,7 @@ function FormComponent() {
             getCountryCodeByIP()
               .then(iso2 => {
                 if (!iso2) return;
-                const list = COUNTRIES[lang] || COUNTRIES['en'];
+                const list = COUNTRIES[lang] || COUNTRIES['de'];
                 const match = list.find(c => c.code === iso2);
                 if (match) {
                   setAnswers(prev => ({
