@@ -1,71 +1,61 @@
 // src/IndustrySelect.js
 
 /**
- * Renders a tree of industries up to 3 levels deep.
- * If `answer` is already set (e.g. prefill), all branches leading
- * to the selected node will be expanded automatically.
+ * Mehrstufige Branchen-Auswahl.
+ * Nutzt den deutschen Branchen-String als Übersetzungs-Key.
  */
 function IndustrySelect({ q, answer, onAnswer, translations, lang, industries }) {
   const e = React.createElement;
   const [expanded, setExpanded] = React.useState({});
 
-  // Helper: find the path of labels leading to the node with code === targetCode
+  // Findet alle übergeordneten Labels, damit wir sie beim Prefill öffnen können
   function findAncestorLabels(nodes, targetCode, ancestors = []) {
     for (const node of nodes) {
-      // leaf node?
       if (node.code === targetCode) {
         return ancestors;
       }
-      // group node?
       if (node.children) {
-        const result = findAncestorLabels(
+        const res = findAncestorLabels(
           node.children,
           targetCode,
           ancestors.concat(node.label)
         );
-        if (result) {
-          return result;
-        }
+        if (res) return res;
       }
     }
     return null;
   }
 
-  // On mount or when `answer` / `industries` change, auto-expand path
+  // Beim Mount / wenn answer wechselt: öffne automatisch die Pfade zum gesetzten Leaf
   React.useEffect(() => {
-    if (!answer || !industries || industries.length === 0) return;
+    if (!answer || industries.length === 0) return;
     const path = findAncestorLabels(industries, answer);
     if (path) {
-      // mark each ancestor label as expanded
       const init = {};
       path.forEach(label => { init[label] = true });
       setExpanded(init);
     }
   }, [answer, industries]);
 
-  // toggle a branch open/closed
   function toggle(label) {
     setExpanded(prev => ({ ...prev, [label]: !prev[label] }));
   }
 
-  // recursively render nodes
   function renderNodes(nodes, level = 0) {
     return nodes.map(node => {
       const isLeaf     = !node.children || node.children.length === 0;
       const isExpanded = !!expanded[node.label];
       const indent     = { marginLeft: level * 16 };
 
-      // display text (could be extended with translations[node.label])
+      // WIR LESEN HIER DIRECT ÜBER DEN GERMAN KEY AUS DEM TRANSLATIONS-SHEET
       const display = translations[node.label] || node.label;
 
-      // branch (has children)
       if (!isLeaf) {
         return e('div', { key: node.label, style: indent },
-          // clickable header
           e('div', {
-              className: 'flex items-center cursor-pointer mb-1',
-              onClick: () => toggle(node.label)
-            },
+            className: 'flex items-center cursor-pointer mb-1',
+            onClick: () => toggle(node.label)
+          },
             e('span', {
               style: {
                 display: 'inline-block',
@@ -76,12 +66,10 @@ function IndustrySelect({ q, answer, onAnswer, translations, lang, industries })
             }, '▸'),
             display
           ),
-          // children if expanded
           isExpanded ? renderNodes(node.children, level + 1) : null
         );
       }
 
-      // leaf
       return e('div', {
         key: node.code,
         style: indent,
@@ -92,12 +80,10 @@ function IndustrySelect({ q, answer, onAnswer, translations, lang, industries })
   }
 
   return e('div', { className: 'mb-4' },
-    e('label', { className: 'block font-medium mb-1' },
-      translations[q.key] || q.text
-    ),
+    e('label', { className: 'block font-medium mb-1' }, translations[q.key] || q.text),
     e('div', {}, renderNodes(industries))
   );
 }
 
-// Register globally so questionRenderer can do e(window.IndustrySelect,…)
+// Globale Registrierung
 window.IndustrySelect = IndustrySelect;
