@@ -52,9 +52,16 @@ function RegionSelect({ q, answer, onAnswer, translations, lang, answers }) {
   const country = answers['country'] || '';
   const options = regionData[country] || [];
 
+  // ① Wenn keine Regionen definiert sind → nichts rendern
+  if (options.length === 0) {
+    return null;
+  }
+
+  // ② Placeholder-Text
   const placeholder = translations['region.placeholder']
     || (lang === 'de' ? 'Bitte wählen' : 'Please select');
 
+  // ③ Tatsächliches Select-Element
   return e('div', { className: 'mb-4' },
     e('label', { className: 'block font-medium mb-1', htmlFor: q.key },
       translations[q.key] || q.text
@@ -73,5 +80,5 @@ function RegionSelect({ q, answer, onAnswer, translations, lang, answers }) {
   );
 }
 
-// Globale Registrierung
+// Globale Registrierung wie bei CountrySelect
 window.RegionSelect = RegionSelect;
