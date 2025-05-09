@@ -123,10 +123,22 @@ function FormComponent() {
     );
   }
 
-  // Sprach-Switcher im Formular
+  // Sprach-Switcher
   const switcher = e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange });
 
-  // Blocks filtern (Update/Free/Visible If usw.)
+  // Hilfsfunktion: findet ein Leaf-Objekt mit .code === sel in der nested tree
+  function findIndustryLeaf(nodes, sel) {
+    for (const n of nodes) {
+      if (n.code === sel) return n;
+      if (n.children) {
+        const found = findIndustryLeaf(n.children, sel);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  // Blocks filtern
   const visibleBlocks = blocks
     .filter(b => b.key && b.key.trim())
     .filter(b => {
@@ -147,7 +159,7 @@ function FormComponent() {
       } catch {}
       return true;
     })
-    // Region-Block nur, wenn Country-Daten existieren
+    // Region nur wenn Daten vorhanden
     .filter(b => {
       if (b.type === 'region') {
         const country = answers['Hauptsitz der Firma'] || '';
@@ -156,21 +168,20 @@ function FormComponent() {
       }
       return true;
     })
-    // Industry Tag–Logik: nur anzeigen, wenn mindestens 1 Tag übereinstimmt
+    // Industry Tag–Logik
     .filter(b => {
-      const raw = b['Industry Tag'] || '';       // <-- use singular header
-      if (!raw.trim()) return true;              // kein Tag → immer zeigen
-      const blockTags = raw.split(';')
-        .map(t => t.trim())
-        .filter(t => t);
+      const raw = b['Industry Tag'] || '';
+      if (!raw.trim()) return true;
+      const blockTags = raw.split(';').map(t => t.trim()).filter(t => t);
       if (blockTags.length === 0) return true;
 
       const sel = answers['Selected Industry'];
       if (!sel) return false;
-      const industry = industries.find(i => i.code === sel);
-      if (!industry || !industry.tags) return false;
 
-      return blockTags.some(tag => industry.tags.includes(tag));
+      const leaf = findIndustryLeaf(industries, sel);
+      if (!leaf || !leaf.tags) return false;
+
+      return blockTags.some(tag => leaf.tags.includes(tag));
     });
 
   // Rendern & Null-Filter
