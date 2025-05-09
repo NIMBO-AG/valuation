@@ -1,7 +1,7 @@
 // src/RegionMap.js
 (function(){
   // TopoJSON mit Admin-1-Grenzen (Provinzen, States etc.)
-  const GEO_URL = 'https://unpkg.com/world-atlas@2.0.2/admin1-10m.json';
+  const GEO_URL = 'https://unpkg.com/world-atlas@2.0.2/countries-10m.json';
 
   function RegionMap(props) {
     const countryCode = props.countryCode;
