@@ -1,8 +1,5 @@
 // src/form.js
 
-import { fetchBlocks, fetchTranslationsCached, fetchPrefill, postAnswers } from './api.js';
-import { fetchIndustriesCached } from './api.js';
-
 function FormComponent() {
   const e = React.createElement;
   const params = new URLSearchParams(window.location.search);
@@ -26,9 +23,9 @@ function FormComponent() {
   // 1) Einmalig: Blocks, Übersetzungen & Industries laden & ggf. Prefill
   React.useEffect(() => {
     Promise.all([
-      fetchBlocks(),
-      fetchTranslationsCached(),
-      fetchIndustriesCached()
+      window.fetchBlocks(),
+      window.fetchTranslationsCached(),
+      window.fetchIndustriesCached()
     ]).then(([blockData, transData, industriesData]) => {
       setBlocks(blockData);
       setTranslations(transData[lang] || {});
@@ -36,7 +33,7 @@ function FormComponent() {
 
       if (valuationId && !isSubmitted) {
         // Update-Mode: Antworten vom Server holen
-        fetchPrefill(valuationId, data => {
+        window.fetchPrefill(valuationId, data => {
           const incoming = data.answers || {};
           const norm = {};
           Object.keys(incoming).forEach(key => {
@@ -49,7 +46,7 @@ function FormComponent() {
           setLoading(false);
         });
       } else {
-        // New-Mode: Neue UUID und Geo-IP, dann fertig
+        // New-Mode: Neue UUID und fertig
         uuidRef.current = generateUUID();
         setLoading(false);
       }
@@ -58,7 +55,7 @@ function FormComponent() {
 
   // 2) Übersetzungen neu laden, wenn sich lang ändert (lässt answers unberührt)
   React.useEffect(() => {
-    fetchTranslationsCached()
+    window.fetchTranslationsCached()
       .then(transData => {
         setTranslations(transData[lang] || {});
       });
@@ -106,7 +103,7 @@ function FormComponent() {
       answers
     };
     setLoading(true);
-    postAnswers(payload, () => {
+    window.postAnswers(payload, () => {
       params.set('uid', myValId);
       params.set('submitted', 'true');
       if (freeCode) params.set('free_code', freeCode);
@@ -182,5 +179,5 @@ function FormComponent() {
   );
 }
 
-// global verfügbar machen
+// Global registrieren, falls Dein Setup es erwartet:
 window.FormComponent = FormComponent;
