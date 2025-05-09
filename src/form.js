@@ -1,5 +1,8 @@
 // src/form.js
 
+import { fetchBlocks, fetchTranslationsCached, fetchPrefill, postAnswers } from './api.js';
+import { fetchIndustriesCached } from './api.js';
+
 function FormComponent() {
   const e = React.createElement;
   const params = new URLSearchParams(window.location.search);
@@ -16,38 +19,44 @@ function FormComponent() {
   const [blocks, setBlocks]             = React.useState([]);
   const [translations, setTranslations] = React.useState({});
   const [answers, setAnswers]           = React.useState({});
+  const [industries, setIndustries]     = React.useState([]);
   const [loading, setLoading]           = React.useState(true);
   const uuidRef                         = React.useRef(valuationId || null);
 
-  // 1) Einmalig: Blocks laden & ggf. Prefill (nur beim Mount)
+  // 1) Einmalig: Blocks, Übersetzungen & Industries laden & ggf. Prefill
   React.useEffect(() => {
-    fetchBlocks()
-      .then(blockData => {
-        setBlocks(blockData);
+    Promise.all([
+      fetchBlocks(),
+      fetchTranslationsCached(),
+      fetchIndustriesCached()
+    ]).then(([blockData, transData, industriesData]) => {
+      setBlocks(blockData);
+      setTranslations(transData[lang] || {});
+      setIndustries(industriesData);
 
-        if (valuationId && !isSubmitted) {
-          // Update-Mode: Antworten vom Server holen
-          fetchPrefill(valuationId, data => {
-            const incoming = data.answers || {};
-            const norm = {};
-            Object.keys(incoming).forEach(key => {
-              const val = incoming[key];
-              norm[key] = (typeof val === 'string' && val.includes(','))
-                ? val.split(/\s*,\s*/)
-                : val;
-            });
-            setAnswers(norm);
-            setLoading(false);
+      if (valuationId && !isSubmitted) {
+        // Update-Mode: Antworten vom Server holen
+        fetchPrefill(valuationId, data => {
+          const incoming = data.answers || {};
+          const norm = {};
+          Object.keys(incoming).forEach(key => {
+            const val = incoming[key];
+            norm[key] = (typeof val === 'string' && val.includes(','))
+              ? val.split(/\s*,\s*/)
+              : val;
           });
-        } else {
-          // New-Mode: Neue UUID und fertig
-          uuidRef.current = generateUUID();
+          setAnswers(norm);
           setLoading(false);
-        }
-      });
-  }, []); // ← leeres Array: nur beim ersten Render
+        });
+      } else {
+        // New-Mode: Neue UUID und Geo-IP, dann fertig
+        uuidRef.current = generateUUID();
+        setLoading(false);
+      }
+    });
+  }, []); // nur einmal beim Mount
 
-  // 2) Sprachen laden bei lang-Change (übersetzt nur, ändert answers nicht)
+  // 2) Übersetzungen neu laden, wenn sich lang ändert (lässt answers unberührt)
   React.useEffect(() => {
     fetchTranslationsCached()
       .then(transData => {
@@ -57,12 +66,11 @@ function FormComponent() {
 
   // 3) Geo-IP-Autofill für country nur einmal, wenn noch nicht gesetzt
   React.useEffect(() => {
-    // finde den "country"-Block-Key
     const countryBlock = blocks.find(b => b.type === 'country');
     if (!countryBlock) return;
 
     const key = countryBlock.key;
-    if (answers[key]) return; // bereits manuell gesetzt
+    if (answers[key]) return; // bereits gesetzt
 
     getCountryCodeByIP()
       .then(iso2 => {
@@ -73,19 +81,17 @@ function FormComponent() {
           setAnswers(prev => ({ ...prev, [key]: match.code }));
         }
       })
-      .catch(() => {
-        /* still ignore */
-      });
-  }, [blocks]); // läuft, sobald blocks gesetzt sind
+      .catch(() => {/* ignore */});
+  }, [blocks]);
 
-  // Handler: Sprache wechseln
+  // Sprache wechseln
   function handleLangChange(newLang) {
     params.set('lang', newLang);
     window.history.replaceState(null, '', '?' + params.toString());
     setLang(newLang);
   }
 
-  // Handler: Formular abschicken
+  // Formular abschicken
   function handleSubmit(eEvt) {
     eEvt.preventDefault();
     const myValId = uuidRef.current;
@@ -108,7 +114,7 @@ function FormComponent() {
     });
   }
 
-  // Loading-State
+  // Loading-Zustand
   if (loading) {
     return e('p', {}, translations.loading || 'Lade…');
   }
@@ -116,10 +122,7 @@ function FormComponent() {
   // Danke-Seite
   if (isSubmitted) {
     return e('div', { className: 'text-center' },
-      e(LanguageSwitcher, {
-        currentLang: lang,
-        onChange: handleLangChange
-      }),
+      e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange }),
       e('p', {}, translations.thankYou),
       e('a', {
         href: window.location.href.replace('&submitted=true', ''),
@@ -128,29 +131,20 @@ function FormComponent() {
     );
   }
 
-  // Sprach-Switcher im Formular
-  const switcher = e(LanguageSwitcher, {
-    currentLang: lang,
-    onChange: handleLangChange
-  });
+  // Sprach-Switcher
+  const switcher = e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange });
 
   // Sichtbare Blocks filtern
   const visibleBlocks = blocks
     .filter(b => b.key && b.key.trim())
     .filter(b => {
-      // Update-/Free-Mode Bedingungen
+      // Update/Free Mode Regeln
       const um = b['Update Mode'] || '';
-      if (updateMode) {
-        if (um === 'hide in update mode') return false;
-      } else if (um === 'only in update mode') {
-        return false;
-      }
+      if (updateMode && um === 'hide in update mode') return false;
+      if (!updateMode && um === 'only in update mode') return false;
       const fm = b['Free Mode'] || '';
-      if (freeMode) {
-        if (fm === 'hide in free mode') return false;
-      } else if (fm === 'only in free mode') {
-        return false;
-      }
+      if (freeMode && fm === 'hide in free mode') return false;
+      if (!freeMode && fm === 'only in free mode') return false;
       // Visible If
       const condRaw = b['Visible If'];
       if (!condRaw) return true;
@@ -169,14 +163,14 @@ function FormComponent() {
     e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
       visibleBlocks.map((b, idx) =>
         e(React.Fragment, { key: b.key || `block-${idx}` },
-          // jetzt immer mit allen 6 Argumenten, inkl. answers
           renderQuestion(
             b,
             answers[b.key] || (b.type === 'checkbox' ? [] : ''),
             val => setAnswers({ ...answers, [b.key]: val }),
             translations,
             lang,
-            answers
+            answers,
+            industries      // übergebe hier das industries-Array
           )
         )
       ),
@@ -188,5 +182,5 @@ function FormComponent() {
   );
 }
 
-// Wenn dein Setup globals erwartet:
+// global verfügbar machen
 window.FormComponent = FormComponent;
