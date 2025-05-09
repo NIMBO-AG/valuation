@@ -6,7 +6,8 @@ function renderQuestion(
   onAnswer,
   translations,
   lang,
-  answers = {}       // Default, damit answers nie undefined ist
+  answers = {},       // Default, damit answers nie undefined ist
+  industries = []     // Default, damit industries nie undefined ist
 ) {
   const e = React.createElement;
   const labelText = translations[q.key] || q.text || '';
@@ -118,6 +119,17 @@ function renderQuestion(
 
     case 'region':
       return e(window.RegionSelect, { q, answer, onAnswer, translations, lang, answers });
+
+    case 'industries':
+      return e(window.IndustrySelect, {
+        q,
+        answer,
+        onAnswer,
+        translations,
+        lang,
+        answers,
+        industries
+      });
 
     default:
       return e('div', {},
