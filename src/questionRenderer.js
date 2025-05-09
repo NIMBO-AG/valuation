@@ -117,7 +117,8 @@ function renderQuestion(
       );
 
     case 'region':
-      // nutzt nun die ausgelagerte Komponente
+        const countryVal = answers['country'] || '';
+        const regions   = regionData[countryVal] || [];
       return e(window.RegionSelect, {
         q,
         answer,
