@@ -34,7 +34,7 @@ function FormComponent() {
       if (valuationId && !isSubmitted) {
         window.fetchPrefill(valuationId, data => {
           const incoming = data.answers || {};
-          const norm = {};
+          const norm     = {};
           Object.keys(incoming).forEach(key => {
             const v = incoming[key];
             norm[key] = (typeof v === 'string' && v.includes(','))
@@ -150,16 +150,21 @@ function FormComponent() {
       const fm = b['Free Mode'] || '';
       if (freeMode && fm === 'hide in free mode') return false;
       if (!freeMode && fm === 'only in free mode') return false;
-      // Visible If
+      // Visible If (now supports spaces in key)
       const cond = b['Visible If'];
       if (!cond) return true;
       try {
-        const m = cond.trim().match(/^(\w+)\s*==\s*"(.+)"$/);
-        if (m) return answers[m[1]] === m[2];
+        // capture everything before == as the key
+        const m = cond.trim().match(/^(.+?)\s*==\s*"(.+)"$/);
+        if (m) {
+          const key = m[1].trim();
+          const val = m[2];
+          return answers[key] === val;
+        }
       } catch {}
       return true;
     })
-    // Region-Block nur, wenn Daten vorhanden
+    // Region nur wenn Daten vorhanden
     .filter(b => {
       if (b.type === 'region') {
         const country = answers['Hauptsitz der Firma'] || '';
@@ -192,7 +197,7 @@ function FormComponent() {
         lang,
         answers,
         industries,
-        setAnswers             // <-- pass setter for radio-other
+        setAnswers // for radio-other
       );
       return el ? e(React.Fragment, { key: b.key || `blk-${idx}` }, el) : null;
     })
