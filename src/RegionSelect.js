@@ -31,19 +31,7 @@ const regionData = {
     "Tennessee","Texas","Utah","Vermont","Virginia","Washington",
     "West Virginia","Wisconsin","Wyoming"
   ],
-  UK: [
-    "Scotland",
-    "Northern Ireland",
-    "Wales",
-    "North East",
-    "North West",
-    "Yorkshire and the Humber",
-    "West Midlands",
-    "East Midlands",
-    "South West",
-    "South East",
-    "East of England",
-    "Greater London"
+  GB: [ "Scotland", "Northern Ireland", "Wales", "North East","North West", "Yorkshire and the Humber", "West Midlands", "East Midlands","South West", "South East",  "East of England", "Greater London"
   ]
 };
 
