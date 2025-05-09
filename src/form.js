@@ -126,7 +126,7 @@ function FormComponent() {
   // Sprach-Switcher im Formular
   const switcher = e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange });
 
-  // Blocks filtern (Update/Free/Visible If)
+  // Blocks filtern (Update/Free/Visible If usw.)
   const visibleBlocks = blocks
     .filter(b => b.key && b.key.trim())
     .filter(b => {
@@ -147,7 +147,7 @@ function FormComponent() {
       } catch {}
       return true;
     })
-    // Region-Block nur, wenn es zu Country Daten gibt
+    // Region-Block nur, wenn Country-Daten existieren
     .filter(b => {
       if (b.type === 'region') {
         const country = answers['Hauptsitz der Firma'] || '';
@@ -156,18 +156,20 @@ function FormComponent() {
       }
       return true;
     })
-    // Industry Tags: nur anzeigen, wenn Block-Tags und Industry-Tags überlappen
+    // Industry Tag–Logik: nur anzeigen, wenn mindestens 1 Tag übereinstimmt
     .filter(b => {
-      const raw = b['Industry Tags'] || '';
-      if (!raw.trim()) return true;  // keine Tags → immer zeigen
-      const blockTags = raw.split(';').map(t => t.trim()).filter(t => t);
+      const raw = b['Industry Tag'] || '';       // <-- use singular header
+      if (!raw.trim()) return true;              // kein Tag → immer zeigen
+      const blockTags = raw.split(';')
+        .map(t => t.trim())
+        .filter(t => t);
       if (blockTags.length === 0) return true;
 
       const sel = answers['Selected Industry'];
       if (!sel) return false;
       const industry = industries.find(i => i.code === sel);
       if (!industry || !industry.tags) return false;
-      // industry.tags ist bereits ein Array
+
       return blockTags.some(tag => industry.tags.includes(tag));
     });
 
