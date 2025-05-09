@@ -32,7 +32,18 @@ const regionData = {
     "West Virginia","Wisconsin","Wyoming"
   ],
   UK: [
-    "England","Schottland","Wales","Nordirland"
+    "Scotland",
+    "Northern Ireland",
+    "Wales",
+    "North East",
+    "North West",
+    "Yorkshire and the Humber",
+    "West Midlands",
+    "East Midlands",
+    "South West",
+    "South East",
+    "East of England",
+    "Greater London"
   ]
 };
 
@@ -61,3 +72,6 @@ function RegionSelect({ q, answer, onAnswer, translations, lang, answers }) {
     )
   );
 }
+
+// Globale Registrierung
+window.RegionSelect = RegionSelect;
