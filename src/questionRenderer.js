@@ -18,21 +18,28 @@ function renderQuestion(
   const raw              = translations[optionsKey] || (q.options || []).join(';');
   const options          = raw.split(';').filter(opt => opt !== '');
 
-  // Renders label + optional instructions under it
+  // Renders label + optional instructions
   function renderLabelAndInstructions() {
     const children = [
-      e('label', { className: 'block font-medium mb-1', htmlFor: q.key }, labelText)
+      e('label',
+        { className: 'block font-medium mb-1', htmlFor: q.key },
+        labelText
+      )
     ];
     if (instructionsText) {
       children.push(
-        e('p', { className: 'text-sm text-gray-600 mb-2' }, instructionsText)
+        e('p',
+          { className: 'text-sm text-gray-600 mb-2' },
+          instructionsText
+        )
       );
     }
     return children;
   }
 
   switch (q.type) {
-    // ─── informational paragraph, no title ────────────────────────────────
+
+    // ─── informational paragraph, no wrapper ─────────────────────────────
     case 'text':
       return e('div', { className: 'mb-4' },
         e('p', {}, labelText)
@@ -46,7 +53,7 @@ function renderQuestion(
           id: q.key,
           type: 'text',
           value: answer || '',
-          maxLength: 500,  // limit to ~5 sentences worth of chars
+          maxLength: 500,  // approx. 5 sentences
           onChange: ev => onAnswer(ev.target.value),
           className: 'w-full border rounded p-2'
         })
@@ -133,51 +140,44 @@ function renderQuestion(
       );
 
     // ─── country dropdown ───────────────────────────────────────────────────
-    case 'country':
-      {
-        const list = COUNTRIES.de;
-        const sortedList = list.slice().sort((a, b) => {
-          const la = translations[`country.${a.code}`] || a.name;
-          const lb = translations[`country.${b.code}`] || b.name;
-          return la.localeCompare(lb, lang);
-        });
-        const placeholderC = translations['country.placeholder']
-          || (lang === 'de' ? 'Bitte wählen' : 'Please select');
-        return e('div', { className: 'mb-4' },
-          ...renderLabelAndInstructions(),
-          e('select', {
-            id: q.key,
-            value: answer || '',
-            onChange: ev => onAnswer(ev.target.value),
-            className: 'w-full border rounded p-2'
-          },
-            e('option', { value: '', disabled: true }, placeholderC),
-            sortedList.map(c =>
-              e('option', { key: c.code, value: c.code },
-                translations[`country.${c.code}`] || c.name
-              )
+    case 'country': {
+      const list = COUNTRIES.de;
+      const sortedList = list.slice().sort((a, b) => {
+        const la = translations[`country.${a.code}`] || a.name;
+        const lb = translations[`country.${b.code}`] || b.name;
+        return la.localeCompare(lb, lang);
+      });
+      const placeholderC = translations['country.placeholder']
+        || (lang === 'de' ? 'Bitte wählen' : 'Please select');
+      return e('div', { className: 'mb-4' },
+        ...renderLabelAndInstructions(),
+        e('select', {
+          id: q.key,
+          value: answer || '',
+          onChange: ev => onAnswer(ev.target.value),
+          className: 'w-full border rounded p-2'
+        },
+          e('option', { value: '', disabled: true }, placeholderC),
+          sortedList.map(c =>
+            e('option', { key: c.code, value: c.code },
+              translations[`country.${c.code}`] || c.name
             )
           )
-        );
-      }
+        )
+      );
+    }
 
-    // ─── region dropdown ────────────────────────────────────────────────────
+    // ─── region dropdown delegated to RegionSelect ─────────────────────────
     case 'region':
-      return e('div', { className: 'mb-4' },
-        ...renderLabelAndInstructions(),
-        e(window.RegionSelect, { q, answer, onAnswer, translations, lang, answers })
-      );
+      return e(window.RegionSelect, { q, answer, onAnswer, translations, lang, answers });
 
-    // ─── industries tree ────────────────────────────────────────────────────
+    // ─── industries tree delegated to IndustrySelect ──────────────────────
     case 'industries':
-      return e('div', { className: 'mb-4' },
-        ...renderLabelAndInstructions(),
-        e(window.IndustrySelect, {
-          q, answer, onAnswer, translations, lang, answers, industries
-        })
-      );
+      return e(window.IndustrySelect, {
+        q, answer, onAnswer, translations, lang, answers, industries
+      });
 
-    // ─── stars rating ───────────────────────────────────────────────────────
+    // ─── star rating ───────────────────────────────────────────────────────
     case 'stars':
       return e('div', { className: 'mb-4' },
         ...renderLabelAndInstructions(),
@@ -196,7 +196,7 @@ function renderQuestion(
         )
       );
 
-    // ─── fallback to single-line text input if type unknown ────────────────
+    // ─── fallback to single-line text input ────────────────────────────────
     default:
       return e('div', { className: 'mb-4' },
         ...renderLabelAndInstructions(),
