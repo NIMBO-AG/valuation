@@ -1,8 +1,14 @@
 // src/questionRenderer.js
 
-function renderQuestion(q, answer, onAnswer, translations, lang, answers) {
+function renderQuestion(
+  q,
+  answer,
+  onAnswer,
+  translations,
+  lang,
+  answers = {}           // Default, falls vergessen
+) {
   const e = React.createElement;
-
   const labelText = translations[q.key] || q.text || '';
   const optionsKey = `${q.key} | Options`;
   const raw = translations[optionsKey] || (q.options || []).join(';');
@@ -111,7 +117,8 @@ function renderQuestion(q, answer, onAnswer, translations, lang, answers) {
       );
 
     case 'region':
-      return e(RegionSelect, {
+      // nutzt nun die ausgelagerte Komponente
+      return e(window.RegionSelect, {
         q,
         answer,
         onAnswer,
