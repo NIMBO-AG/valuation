@@ -1,16 +1,16 @@
 // src/form.js
 
 function FormComponent() {
-  const e = React.createElement;
+  const e      = React.createElement;
   const params = new URLSearchParams(window.location.search);
 
-  // URL-Parameter
-  const [lang, setLang] = React.useState(params.get('lang') || 'de');
-  const valuationId     = params.get('uid');
-  const isSubmitted     = params.get('submitted') === 'true';
-  const freeCode        = params.get('free_code') || '';
-  const updateMode      = Boolean(valuationId);
-  const freeMode        = freeCode && freeCode !== '-';
+  // URL-Parameter & Modes
+  const [lang, setLang]       = React.useState(params.get('lang') || 'de');
+  const valuationId           = params.get('uid');
+  const isSubmitted           = params.get('submitted') === 'true';
+  const freeCode              = params.get('free_code') || '';
+  const updateMode            = Boolean(valuationId);
+  const freeMode              = freeCode && freeCode !== '-';
 
   // App-State
   const [blocks, setBlocks]             = React.useState([]);
@@ -20,7 +20,7 @@ function FormComponent() {
   const [loading, setLoading]           = React.useState(true);
   const uuidRef                         = React.useRef(valuationId || null);
 
-  // 1) Einmalig: Blocks, Übersetzungen & Industries laden & ggf. Prefill
+  // 1) Load blocks, translations, industries & prefill on mount
   React.useEffect(() => {
     Promise.all([
       window.fetchBlocks(),
@@ -32,43 +32,38 @@ function FormComponent() {
       setIndustries(industriesData);
 
       if (valuationId && !isSubmitted) {
-        // Update-Mode: Antworten vom Server holen
         window.fetchPrefill(valuationId, data => {
           const incoming = data.answers || {};
-          const norm = {};
+          const norm     = {};
           Object.keys(incoming).forEach(key => {
-            const val = incoming[key];
-            norm[key] = (typeof val === 'string' && val.includes(','))
-              ? val.split(/\s*,\s*/)
-              : val;
+            const v = incoming[key];
+            norm[key] = (typeof v === 'string' && v.includes(','))
+              ? v.split(/\s*,\s*/)
+              : v;
           });
           setAnswers(norm);
           setLoading(false);
         });
       } else {
-        // New-Mode: Neue UUID und fertig
         uuidRef.current = generateUUID();
         setLoading(false);
       }
     });
-  }, []); // nur einmal beim Mount
+  }, []); // only once
 
-  // 2) Übersetzungen neu laden, wenn sich lang ändert (lässt answers unberührt)
+  // 2) Reload translations on lang change (don’t reset answers)
   React.useEffect(() => {
-    window.fetchTranslationsCached()
-      .then(transData => {
-        setTranslations(transData[lang] || {});
-      });
+    window.fetchTranslationsCached().then(transData => {
+      setTranslations(transData[lang] || {});
+    });
   }, [lang]);
 
-  // 3) Geo-IP-Autofill für country nur einmal, wenn noch nicht gesetzt
+  // 3) Geo-IP autofill for country once blocks are loaded
   React.useEffect(() => {
     const countryBlock = blocks.find(b => b.type === 'country');
     if (!countryBlock) return;
-
     const key = countryBlock.key;
-    if (answers[key]) return; // bereits gesetzt
-
+    if (answers[key]) return; // already set
     getCountryCodeByIP()
       .then(iso2 => {
         if (!iso2) return;
@@ -78,17 +73,17 @@ function FormComponent() {
           setAnswers(prev => ({ ...prev, [key]: match.code }));
         }
       })
-      .catch(() => {/* ignore */});
+      .catch(() => {});
   }, [blocks]);
 
-  // Sprache wechseln
+  // Language switch handler
   function handleLangChange(newLang) {
     params.set('lang', newLang);
     window.history.replaceState(null, '', '?' + params.toString());
     setLang(newLang);
   }
 
-  // Formular abschicken
+  // Submit handler
   function handleSubmit(eEvt) {
     eEvt.preventDefault();
     const myValId = uuidRef.current;
@@ -111,12 +106,12 @@ function FormComponent() {
     });
   }
 
-  // Loading-Zustand
+  // Loading indicator
   if (loading) {
     return e('p', {}, translations.loading || 'Lade…');
   }
 
-  // Danke-Seite
+  // Thank-you page
   if (isSubmitted) {
     return e('div', { className: 'text-center' },
       e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange }),
@@ -128,49 +123,49 @@ function FormComponent() {
     );
   }
 
-  // Sprach-Switcher
+  // Build language switcher
   const switcher = e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange });
 
-  // Sichtbare Blocks filtern
+  // Filter blocks by key, mode flags, Visible If
   const visibleBlocks = blocks
     .filter(b => b.key && b.key.trim())
     .filter(b => {
-      // Update/Free Mode Regeln
       const um = b['Update Mode'] || '';
       if (updateMode && um === 'hide in update mode') return false;
       if (!updateMode && um === 'only in update mode') return false;
       const fm = b['Free Mode'] || '';
       if (freeMode && fm === 'hide in free mode') return false;
       if (!freeMode && fm === 'only in free mode') return false;
-      // Visible If
       const condRaw = b['Visible If'];
       if (!condRaw) return true;
       try {
         const m = condRaw.trim().match(/^(\w+)\s*==\s*"(.+)"$/);
         if (m) return answers[m[1]] === m[2];
-      } catch {
-        console.warn('Invalid Visible If:', condRaw);
-      }
+      } catch {}
       return true;
     });
 
-  // Rendern
+  // Render each block, but skip any where renderQuestion returns null
+  const formElements = visibleBlocks
+    .map((b, idx) => {
+      const element = renderQuestion(
+        b,
+        answers[b.key] || (b.type === 'checkbox' ? [] : ''),
+        val => setAnswers({ ...answers, [b.key]: val }),
+        translations,
+        lang,
+        answers,
+        industries
+      );
+      if (!element) return null;
+      return e(React.Fragment, { key: b.key || `blk-${idx}` }, element);
+    })
+    .filter(el => el !== null);
+
   return e('div', {},
     switcher,
     e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
-      visibleBlocks.map((b, idx) =>
-        e(React.Fragment, { key: b.key || `block-${idx}` },
-          renderQuestion(
-            b,
-            answers[b.key] || (b.type === 'checkbox' ? [] : ''),
-            val => setAnswers({ ...answers, [b.key]: val }),
-            translations,
-            lang,
-            answers,
-            industries      // übergebe hier das industries-Array
-          )
-        )
-      ),
+      ...formElements,
       e('button', {
         type: 'submit',
         className: 'bg-blue-600 text-white px-4 py-2 rounded'
@@ -179,5 +174,4 @@ function FormComponent() {
   );
 }
 
-// Global registrieren, falls Dein Setup es erwartet:
 window.FormComponent = FormComponent;
