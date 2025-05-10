@@ -144,7 +144,7 @@ function renderQuestion(
       );
     }
 
-    // ------------- RESTORE COUNTRY DROPDOWN -------------
+    // country dropdown
     case 'country': {
       const list   = COUNTRIES.de;
       const sorted = list.slice().sort((a,b) => {
@@ -238,6 +238,12 @@ function renderQuestion(
             }, answer>=n?'★':'☆')
           )
         )
+      );
+
+    // --------- NEW: finance block ----------
+    case 'finance':
+      return e('div', { className: 'mb-4' },
+        e(window.FinanceInput, { answers, setAnswers, translations, lang })
       );
 
     // fallback text input
