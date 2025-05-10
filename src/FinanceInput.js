@@ -1,101 +1,147 @@
 // src/FinanceInput.js
 
-function FinanceInput({ answers, setAnswers }) {
+function FinanceInput({ answers, setAnswers, translations, lang }) {
   const e = React.createElement;
+  const allYears = [2023, 2024, 2025];
   const selectedYears = answers['Finance Years'] || [];
-  const years = [2023, 2024, 2025];
 
-  function handleCheckboxChange(year) {
-    const updated = selectedYears.includes(year)
-      ? selectedYears.filter(y => y !== year)
-      : [...selectedYears, year];
-    setAnswers({ ...answers, 'Finance Years': updated });
+  // Toggle years
+  function handleYearToggle(y) {
+    const next = selectedYears.includes(y)
+      ? selectedYears.filter(z => z !== y)
+      : [...selectedYears, y].sort();
+    setAnswers({ ...answers, 'Finance Years': next });
   }
 
-  function handleChange(key, year, val) {
-    setAnswers({
-      ...answers,
-      [`${key} ${year}`]: val
-    });
+  // Write a numeric answer
+  function write(key, year, raw) {
+    const val = raw === '' ? '' : parseFloat(raw);
+    setAnswers({ ...answers, [`${key} ${year}`]: val });
   }
 
-  function parse(val) {
-    const f = parseFloat(val);
-    return isNaN(f) ? null : f;
+  // Parse safe
+  function parse(key, year) {
+    const v = answers[`${key} ${year}`];
+    return typeof v === 'number' ? v : NaN;
   }
 
-  function calcEBITMargin(year) {
-    const rev = parse(answers[`Umsatz ${year}`]);
-    const ebit = parse(answers[`EBIT ${year}`]);
-    if (rev && ebit) return (ebit / rev * 100).toFixed(1) + '%';
-    return '';
+  // Calculations
+  function ebitMargin(year) {
+    const rev = parse('Umsatz', year),
+          ebt = parse('EBIT', year);
+    return rev > 0 && !isNaN(ebt)
+      ? (ebt / rev * 100).toFixed(1) + '%'
+      : '';
   }
-
-  function calcAdjustedEBIT(year) {
-    const ebit = parse(answers[`EBIT ${year}`]) || 0;
-    const adj = parse(answers[`EBIT Anpassung ${year}`]) || 0;
-    return ebit + adj;
+  function adjEBIT(year) {
+    const ebt = parse('EBIT', year) || 0,
+          adj = parse('EBIT Anpassung', year) || 0;
+    return (ebt + adj).toLocaleString('de-CH');
   }
-
-  function calcEBITC(year) {
-    const adj = calcAdjustedEBIT(year);
-    const ceo = parse(answers[`CEO-Saläre ${year}`]) || 0;
+  function ebitc(year) {
+    const ceo = parse('CEO-Saläre', year) || 0;
+    const adj = parse('EBIT', year) + (parse('EBIT Anpassung', year)||0);
     return (adj + ceo).toLocaleString('de-CH');
   }
+  function opCost(year) {
+    const rev = parse('Umsatz', year) || 0;
+    const ebt = parse('EBIT', year) || 0;
+    const dep = parse('Abschreibungen', year) || 0;
+    const ceo = parse('CEO-Saläre', year) || 0;
+    return (rev - ebt - dep - ceo).toLocaleString('de-CH');
+  }
 
-  const headRow = e('tr', {},
-    e('th', {}, 'Posten'),
-    ...years.map(y => e('th', {}, y))
-  );
-
-  function inputRow(label, key) {
-    return e('tr', {},
-      e('td', {}, label),
-      ...years.map(y => e('td', {},
-        selectedYears.includes(y)
-          ? e('input', {
-              type: 'number',
-              value: answers[`${key} ${y}`] || '',
-              onChange: e => handleChange(key, y, e.target.value),
-              className: 'w-28 border px-1'
-            })
-          : null
-      ))
+  // Accordion item component
+  function AccordionItem({ title, summary, children }) {
+    const [open, setOpen] = React.useState(false);
+    return e('div', { className: 'border rounded mb-4' },
+      // Header
+      e('button', {
+        onClick: () => setOpen(o => !o),
+        className: 'w-full flex justify-between items-center p-2 bg-gray-100'
+      },
+        e('span', { className: 'font-medium' }, title),
+        e('span', { className: 'text-sm flex space-x-2' },
+          ...summary.map((s,i) =>
+            e('span',{ key:i, className:'px-2 py-0.5 bg-white border' }, s)
+          ),
+          e('span', {}, open ? '–' : '+')
+        )
+      ),
+      // Body
+      open && e('div', { className: 'p-2 bg-white' }, children)
     );
   }
 
-  const displayRow = (label, calcFn) => e('tr', {},
-    e('td', {}, label),
-    ...years.map(y => e('td', {}, selectedYears.includes(y) ? calcFn(y) : ''))
-  );
+  // Render one section
+  function renderSection(label, key, isComputed, computeFn) {
+    const summary = allYears.map(y =>
+      selectedYears.includes(y)
+        ? (isComputed
+            ? computeFn(y)
+            : (answers[`${key} ${y}`] != null
+                ? answers[`${key} ${y}`].toLocaleString('de-CH')
+                : '')
+          )
+        : ''
+    );
 
-  return e('div', { className: 'space-y-4' },
+    const body = selectedYears.map(y =>
+      e('div',{ key:y, className:'flex items-center mb-2' },
+        e('label',{ className:'w-32' }, `${y}`),
+        isComputed
+          ? e('span', {}, computeFn(y))
+          : e('input', {
+              type: 'number',
+              value: answers[`${key} ${y}`] ?? '',
+              onChange: ev => write(key, y, ev.target.value),
+              className: 'w-24 border rounded p-1 ml-2'
+            })
+      )
+    );
+
+    return e(AccordionItem,
+      { title: label, summary: summary },
+      body
+    );
+  }
+
+  return e('div', { className: 'space-y-6' },
+    // Year selector
     e('div', {},
-      e('label', { className: 'font-medium' }, 'Welche Jahre sollen berücksichtigt werden?'),
-      e('div', { className: 'flex gap-4 mt-1' },
-        years.map(y => e('label', { className: 'flex items-center gap-1' },
-          e('input', {
-            type: 'checkbox',
-            checked: selectedYears.includes(y),
-            onChange: () => handleCheckboxChange(y)
-          }),
-          y
-        ))
+      e('label', { className:'font-medium' },
+        translations['FinanceInput.years'] || 'Welche Jahre berücksichtigen?'
+      ),
+      e('div',{ className:'flex gap-4 mt-1' },
+        allYears.map(y =>
+          e('label',{ key:y, className:'flex items-center gap-1' },
+            e('input', {
+              type: 'checkbox',
+              checked: selectedYears.includes(y),
+              onChange: () => handleYearToggle(y)
+            }),
+            y
+          )
+        )
       )
     ),
-    e('table', { className: 'table-auto text-sm border-collapse' },
-      e('thead', {}, headRow),
-      e('tbody', {},
-        inputRow('Umsatz', 'Umsatz'),
-        inputRow('EBIT', 'EBIT'),
-        displayRow('EBIT-Marge', calcEBITMargin),
-        inputRow('Abschreibungen', 'Abschreibungen'),
-        inputRow('CEO-Saläre', 'CEO-Saläre'),
-        inputRow('EBIT Anpassung', 'EBIT Anpassung'),
-        displayRow('EBIT angepasst', calcAdjustedEBIT),
-        displayRow('EBITC (EBIT + CEO)', calcEBITC)
-      )
-    )
+
+    // Only render P&L if at least one year
+    selectedYears.length === 0
+      ? e('p',{ className:'text-red-600' }, 'Bitte mindestens ein Jahr wählen.')
+      : e('div', {}, 
+          renderSection('Umsatz','Umsatz', false),
+          renderSection('Gehälter GF','CEO-Saläre', false),
+          renderSection(
+            'Operative Kosten (Sammelposten)','', true, opCost
+          ),
+          renderSection('Abschreibungen','Abschreibungen', false),
+          renderSection('EBIT','EBIT', false),
+          renderSection('EBIT-Marge','', true, ebitMargin),
+          renderSection('EBIT Anpassung','EBIT Anpassung', false),
+          renderSection('Angepasstes EBIT','', true, adjEBIT),
+          renderSection('EBITC (EBIT + CEO)','', true, ebitc)
+        )
   );
 }
 
