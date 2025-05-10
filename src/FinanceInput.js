@@ -99,4 +99,4 @@ function FinanceInput({ answers, setAnswers }) {
   );
 }
 
-window.renderFinanceInput = FinanceInput;
+window.FinanceInput = FinanceInput;
