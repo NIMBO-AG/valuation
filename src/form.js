@@ -49,7 +49,7 @@ function FormComponent() {
         setLoading(false);
       }
     });
-  }, []); // nur einmal
+  }, []); // nur einmal beim Mount
 
   // 2) Translations neu laden bei lang-Wechsel
   React.useEffect(() => {
@@ -123,10 +123,10 @@ function FormComponent() {
     );
   }
 
-  // Sprach-Switcher
+  // Sprach-Switcher fürs Formular
   const switcher = e(LanguageSwitcher, { currentLang: lang, onChange: handleLangChange });
 
-  // Hilfsfunktion: findet Leaf mit code === sel
+  // Hilfsfunktion: findet einen Leaf mit .code === sel
   function findIndustryLeaf(nodes, sel) {
     for (const n of nodes) {
       if (n.code === sel) return n;
@@ -138,23 +138,22 @@ function FormComponent() {
     return null;
   }
 
-  // Blocks filtern
+  // Blocks filtern (Update/Free/Visible If/Region/Industry-Tag)
   const visibleBlocks = blocks
     .filter(b => b.key && b.key.trim())
     .filter(b => {
       // Update Mode
       const um = b['Update Mode'] || '';
-      if (updateMode && um === 'hide in update mode') return false;
-      if (!updateMode && um === 'only in update mode') return false;
+      if (updateMode && um === 'hide in update mode')    return false;
+      if (!updateMode && um === 'only in update mode')   return false;
       // Free Mode
       const fm = b['Free Mode'] || '';
-      if (freeMode && fm === 'hide in free mode') return false;
-      if (!freeMode && fm === 'only in free mode') return false;
-      // Visible If (now supports spaces in key)
+      if (freeMode && fm === 'hide in free mode')        return false;
+      if (!freeMode && fm === 'only in free mode')       return false;
+      // Visible If
       const cond = b['Visible If'];
       if (!cond) return true;
       try {
-        // capture everything before == as the key
         const m = cond.trim().match(/^(.+?)\s*==\s*"(.+)"$/);
         if (m) {
           const key = m[1].trim();
@@ -164,7 +163,7 @@ function FormComponent() {
       } catch {}
       return true;
     })
-    // Region nur wenn Daten vorhanden
+    // Region nur anzeigen, wenn Daten vorhanden
     .filter(b => {
       if (b.type === 'region') {
         const country = answers['Hauptsitz der Firma'] || '';
@@ -197,12 +196,15 @@ function FormComponent() {
         lang,
         answers,
         industries,
-        setAnswers // for radio-other
+        setAnswers
       );
-      return el ? e(React.Fragment, { key: b.key || `blk-${idx}` }, el) : null;
+      return el
+        ? e(React.Fragment, { key: b.key || `blk-${idx}` }, el)
+        : null;
     })
     .filter(x => x);
 
+  // Finale Rückgabe
   return e('div', {}, switcher,
     e('form', { onSubmit: handleSubmit, className: 'space-y-4' },
       ...formElements,
@@ -215,13 +217,3 @@ function FormComponent() {
 }
 
 window.FormComponent = FormComponent;
-
-// Vorschau bei Bedarf einfügen
-React.useEffect(() => {
-  const relevant = blocks.some(b => b.type && b.type.startsWith('fin'));
-  if (relevant && !document.querySelector('#pl-preview')) {
-    const html = window.renderPLPreview();
-    document.body.insertAdjacentHTML('beforeend', html);
-  }
-}, [blocks]);
-
