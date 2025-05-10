@@ -3,11 +3,11 @@
 function FinanceInput({ answers, setAnswers, translations, lang }) {
   const e = React.createElement;
   const allYears = [2023, 2024, 2025];
-  // Per default alle Jahre auswählen, wenn noch nichts gespeichert ist
+  // Per default alle Jahre auswählen, wenn noch nichts gespeichert
   const stored = answers['Finance Years'];
   const selectedYears = Array.isArray(stored) ? stored : allYears;
 
-  // Toggle Year
+  // Jahr an- und abwählen
   function handleYearToggle(y) {
     const next = selectedYears.includes(y)
       ? selectedYears.filter(z => z !== y)
@@ -15,19 +15,19 @@ function FinanceInput({ answers, setAnswers, translations, lang }) {
     setAnswers({ ...answers, 'Finance Years': next });
   }
 
-  // Schreibe numerischen Wert
+  // Zahl schreiben
   function write(key, year, raw) {
     const val = raw === '' ? '' : parseFloat(raw);
     setAnswers({ ...answers, [`${key} ${year}`]: val });
   }
 
-  // Sichere Parsetaste
+  // Lesen als Zahl
   function parseVal(key, year) {
     const v = answers[`${key} ${year}`];
     return typeof v === 'number' ? v : NaN;
   }
 
-  // Berechnungen
+  // Berechnungs-Helpers
   function ebitMargin(year) {
     const rev = parseVal('Umsatz', year),
           ebt = parseVal('EBIT', year);
@@ -54,10 +54,11 @@ function FinanceInput({ answers, setAnswers, translations, lang }) {
     return (rev - ebt - dep - ceo).toLocaleString('de-CH');
   }
 
-  // Accordion-Item
+  // Akkordeon-Item
   function AccordionItem({ title, summary, children }) {
     const [open, setOpen] = React.useState(false);
     return e('div', { className: 'border rounded mb-4' },
+      // Header
       e('button', {
         onClick: () => setOpen(o => !o),
         className: 'w-full flex justify-between items-center p-2 bg-gray-100'
@@ -65,11 +66,12 @@ function FinanceInput({ answers, setAnswers, translations, lang }) {
         e('span', { className: 'font-medium' }, title),
         e('span', { className: 'text-sm flex space-x-2' },
           ...summary.map((s,i) =>
-            e('span', { key: i, className: 'px-2 py-0.5 bg-white border' }, s)
+            e('span',{ key:i, className:'px-2 py-0.5 bg-white border' }, s)
           ),
           e('span', {}, open ? '–' : '+')
         )
       ),
+      // Body
       open && e('div', { className: 'p-2 bg-white' }, children)
     );
   }
@@ -89,15 +91,18 @@ function FinanceInput({ answers, setAnswers, translations, lang }) {
     );
 
     const body = selectedYears.map(y =>
-      e('div', { key: y, className: 'flex items-center mb-2' },
-        e('label', { className: 'w-32' }, `${y}`),
+      e('div',{ key:y, className:'flex items-center mb-2' },
+        e('label',{ className:'w-32' }, `${y}`),
         isComputed
+          // reine Anzeige
           ? e('span', {}, computeFn(y))
+          // Eingabe mit Enter-Abfang
           : e('input', {
-              type: 'number',
-              value: answers[`${key} ${y}`] ?? '',
-              onChange: ev => write(key, y, ev.target.value),
-              className: 'w-24 border rounded p-1 ml-2'
+              type:       'number',
+              value:      answers[`${key} ${y}`] ?? '',
+              onChange:   ev => write(key, y, ev.target.value),
+              onKeyDown:  ev => { if (ev.key === 'Enter') ev.preventDefault(); },
+              className:  'w-24 border rounded p-1 ml-2'
             })
       )
     );
@@ -108,12 +113,12 @@ function FinanceInput({ answers, setAnswers, translations, lang }) {
   return e('div', { className: 'space-y-6' },
     // Jahresauswahl
     e('div', {},
-      e('label', { className: 'font-medium' },
+      e('label', { className:'font-medium' },
         translations['FinanceInput.years'] || 'Welche Jahre berücksichtigen?'
       ),
-      e('div', { className: 'flex gap-4 mt-1' },
+      e('div',{ className:'flex gap-4 mt-1' },
         allYears.map(y =>
-          e('label', { key: y, className: 'flex items-center gap-1' },
+          e('label',{ key:y, className:'flex items-center gap-1' },
             e('input', {
               type: 'checkbox',
               checked: selectedYears.includes(y),
@@ -127,17 +132,17 @@ function FinanceInput({ answers, setAnswers, translations, lang }) {
 
     // P&L-Sektionen
     selectedYears.length === 0
-      ? e('p', { className: 'text-red-600' }, 'Bitte mindestens ein Jahr wählen.')
+      ? e('p',{ className:'text-red-600' }, 'Bitte mindestens ein Jahr wählen.')
       : e('div', {},
-          renderSection('Umsatz', 'Umsatz', false),
-          renderSection('Gehälter GF', 'CEO-Saläre', false),
-          renderSection('Operative Kosten (Sammelposten)', '', true, opCost),
-          renderSection('Abschreibungen', 'Abschreibungen', false),
-          renderSection('EBIT', 'EBIT', false),
-          renderSection('EBIT-Marge', '', true, ebitMargin),
-          renderSection('EBIT Anpassung', 'EBIT Anpassung', false),
-          renderSection('Angepasstes EBIT', '', true, adjEBIT),
-          renderSection('EBITC (EBIT + CEO)', '', true, ebitc)
+          renderSection('Umsatz','Umsatz', false),
+          renderSection('Gehälter GF','CEO-Saläre', false),
+          renderSection('Operative Kosten (Sammelposten)','', true, opCost),
+          renderSection('Abschreibungen','Abschreibungen', false),
+          renderSection('EBIT','EBIT', false),
+          renderSection('EBIT-Marge','', true, ebitMargin),
+          renderSection('EBIT Anpassung','EBIT Anpassung', false),
+          renderSection('Angepasstes EBIT','', true, adjEBIT),
+          renderSection('EBITC (EBIT + CEO)','', true, ebitc)
         )
   );
 }
