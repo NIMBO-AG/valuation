@@ -22,39 +22,50 @@
       setAnswers({ ...answers, 'Finance Years': next });
     }
 
-    function handleChange(key, year, raw) {
-      const cleaned = (raw || '')
-        .replace(/[^0-9\.\-,]/g, '')
-        .replace(/(\..*?)\./g, '$1')
-        .replace(/(,.*?)\,/g, '$1');
-      setAnswers({
-        ...answers,
-        [`${key} ${year}`]: cleaned
-      });
-    }
-
+    // parse German‐style string into a number
     function parseNum(val) {
-      const str = (val == null ? '' : String(val));
-      const normalized = str
-        .replace(/\./g, '')
-        .replace(',', '.');
-      const n = parseFloat(normalized);
+      const s = (val == null ? '' : String(val))
+        .replace(/\./g,'')    // drop thousands sep
+        .replace(',','.');
+      const n = parseFloat(s);
       return isNaN(n) ? 0 : n;
     }
 
+    // format number with “de-CH” separators
     function formatNum(val) {
       const n = parseNum(val);
       if ((val == null || val === '') && n === 0) return '';
       return n.toLocaleString('de-CH');
     }
 
-    // computations
+    // when any input changes, store it— but if it’s EBIT ensure ≤ Umsatz
+    function handleChange(key, year, raw) {
+      let cleaned = (raw || '')
+        .replace(/[^0-9\.\-,]/g,'')
+        // disallow double dots/commas
+        .replace(/(\..*?)\./g,'$1')
+        .replace(/(,.*?)\,/g,'$1');
+
+      if (key === 'EBIT') {
+        const entered = parseNum(cleaned);
+        const rev     = parseNum(answers[`Umsatz ${year}`]);
+        if (entered > rev) {
+          // clamp down
+          cleaned = String(rev);
+        }
+      }
+
+      setAnswers({
+        ...answers,
+        [`${key} ${year}`]: cleaned
+      });
+    }
+
+    // derived calculations
     function calcEBITMargin(y) {
       const rev  = parseNum(answers[`Umsatz ${y}`]);
       const ebit = parseNum(answers[`EBIT ${y}`]);
-      return rev > 0
-        ? Math.round((ebit / rev) * 100) + '%'
-        : '';
+      return rev > 0 ? Math.round((ebit/rev)*100) + '%' : '';
     }
     function calcAdjustedEBIT(y) {
       const ebit = parseNum(answers[`EBIT ${y}`]);
@@ -67,7 +78,6 @@
       return formatNum(adj + ceo);
     }
 
-    // explanations text
     const explanations = {
       'Umsatz':         'Geben Sie Ihren Jahresumsatz (ohne MwSt) in CHF an.',
       'EBIT':           'Ergebnis vor Zinsen & Steuern (nach GF-Löhnen).',
@@ -93,24 +103,24 @@
 
     // table header
     const header = e('tr', {},
-      e('th', { className:'px-2 py-1 bg-gray-200 text-left' }, 'Posten'),
+      e('th',{ className:'px-2 py-1 bg-gray-200 text-left' }, 'Posten'),
       ...years.map(y =>
-        e('th', { key:y, className:'px-2 py-1 bg-gray-200 text-center' }, y)
+        e('th',{ key:y,className:'px-2 py-1 bg-gray-200 text-center' }, y)
       )
     );
 
-    // build body
+    // build rows + optional explanation
     const body = [];
     rows.forEach(r => {
       body.push(
-        e('tr', { key:r.key, className:'border-t' },
-          e('td', { className:'px-2 py-1 bg-gray-100 flex items-center' },
-            e('button', {
+        e('tr',{ key:r.key, className:'border-t' },
+          e('td',{ className:'px-2 py-1 bg-gray-100 flex items-center' },
+            e('button',{
               type:'button',
               onClick:()=>toggleRow(r.key),
               className:'mr-2 select-none'
-            }, openRow === r.key ? '▼' : '▶'),
-            e('span',{}, r.label)
+            }, openRow===r.key ? '▼' : '▶'),
+            e('span',{},r.label)
           ),
           ...years.map(y =>
             e('td',{ key:y, className:'px-2 py-1 text-center' },
@@ -120,25 +130,23 @@
                         type:'text',
                         inputMode:'numeric',
                         className:'w-24 border rounded px-1 text-right',
-                        value: formatNum(answers[`${r.key} ${y}`]),
-                        onFocus: ()=>{ if(openRow !== r.key) toggleRow(r.key); },
+                        value:formatNum(answers[`${r.key} ${y}`]),
+                        onFocus:()=>{ if(openRow!==r.key) toggleRow(r.key); },
                         onChange:ev=>handleChange(r.key,y,ev.target.value),
                         onKeyDown:ev=>{ if(ev.key==='Enter') ev.preventDefault(); }
                       })
-                    : e('span',{}, r.calc(y))
+                    : e('span',{},r.calc(y))
                   )
                 : null
             )
           )
         )
       );
-      // only one explanation row, if that row is open
-      if (openRow === r.key && explanations[r.key]) {
+      if (openRow===r.key && explanations[r.key]) {
         body.push(
           e('tr',{ key:r.key+'-exp' },
-            e('td',{
-              colSpan: years.length+1,
-              className:'bg-gray-50 px-3 py-1 text-sm text-gray-600 italic'
+            e('td',{ colSpan:years.length+1,
+                     className:'bg-gray-50 px-3 py-1 text-sm text-gray-600 italic'
             }, explanations[r.key])
           )
         );
@@ -148,21 +156,20 @@
     return e('div',{ className:'space-y-6' },
       // year selectors
       e('div',{ className:'flex gap-6' },
-        years.map(y =>
+        years.map(y=>
           e('label',{ key:y, className:'flex items-center space-x-1' },
             e('input',{
               type:'checkbox',
-              checked: selectedYears.includes(y),
+              checked:selectedYears.includes(y),
               onChange:()=>toggleYear(y)
-            }),
-            e('span',{}, y)
+            }), e('span',{},y)
           )
         )
       ),
-      // the table
+      // the table itself
       e('table',{ className:'w-full table-auto border-collapse text-sm' },
-        e('thead',{}, header),
-        e('tbody',{}, ...body)
+        e('thead',{},header),
+        e('tbody',{},...body)
       )
     );
   }
