@@ -22,10 +22,10 @@
     function parseNum(val) {
       if (val == null) return null;
       const s = val.toString()
-        .replace(/['\u2019]/g, '')
-        .replace(/\s/g, '')
-        .replace(/\./g, '')
-        .replace(/,/g, '.');
+        .replace(/['\u2019]/g, '')   // Apostroph entfernen
+        .replace(/\s/g, '')          // Leerzeichen entfernen
+        .replace(/\./g, '')          // Punkte als Tausender entfernen
+        .replace(/,/g, '.');         // Komma → Dezimalpunkt
       const f = parseFloat(s);
       return isNaN(f) ? null : f;
     }
@@ -42,13 +42,7 @@
     const ebitC = absC && selectedYears.every(y => parseNum(answers[`EBIT ${y}`]) != null);
     const adjC  = ebitC && selectedYears.every(y => parseNum(answers[`EBIT Anpassung ${y}`]) != null);
 
-    // 4) Automatisches Weiter-Öffnen
-    useEffect(() => { if (revC  && openRow==='Umsatz')           setOpenRow('CEO-Saläre'); }, [revC, openRow]);
-    useEffect(() => { if (ceoC  && openRow==='CEO-Saläre')       setOpenRow('Abschreibungen'); }, [ceoC, openRow]);
-    useEffect(() => { if (absC  && openRow==='Abschreibungen')   setOpenRow('EBIT'); }, [absC, openRow]);
-    useEffect(() => { if (ebitC && openRow==='EBIT')             setOpenRow('EBIT Anpassung'); }, [ebitC, openRow]);
-
-    // 5) Setter-Funktionen
+    // 4) Setter-Funktionen
     function toggleRow(key) {
       setOpenRow(openRow === key ? null : key);
     }
@@ -63,11 +57,11 @@
       setAnswers({ ...answers, 'Einzelgeschäftsführung': ans });
     }
 
-    // 6) Kalkulationen
+    // 5) Kalkulationen
     function calcEBITMargin(y) {
       const rev  = parseNum(answers[`Umsatz ${y}`]) || 0;
       const ebit = parseNum(answers[`EBIT ${y}`])   || 0;
-      return rev>0 ? Math.round(ebit/rev*100)+'%' : '';
+      return rev > 0 ? Math.round(ebit/rev*100)+'%' : '';
     }
     function calcAdjEBIT(y) {
       const ebit = parseNum(answers[`EBIT ${y}`])      || 0;
@@ -79,7 +73,7 @@
       return formatNum((calcAdjEBIT(y) + ceo).toString());
     }
 
-    // 7) Reihen-Definition
+    // 6) Reihen-Definition
     const rows = [
       { label:'Umsatz',           key:'Umsatz',         input:true,  show:()=>true   },
       { label:'CEO-Saläre',       key:'CEO-Saläre',     input:true,  show:()=>revC   },
@@ -91,7 +85,7 @@
       { label:'EBITC (EBIT+CEO)', key:'EBITC (EBIT+CEO)',input:false,show:()=>ebitC }
     ].filter(r => r.show());
 
-    // 8) Row-Renderer
+    // 7) Row-Renderer
     function renderRow(r) {
       const { label, key, input } = r;
       const isOpen = openRow === key;
@@ -122,7 +116,7 @@
         if (isOpen) {
           const info = e('tr',{ key:key+'-instr', className:'bg-gray-50' },
             e('td',{ colSpan:years.length+1, className:'px-2 py-2 italic text-gray-700 text-right' },
-              'Jahresumsatz in CHF (ohne MWSt.)'
+              'Jahresumsatz in CHF (ohne MWSt.):'
             )
           );
           return [ info, main ];
@@ -155,12 +149,12 @@
           ))
         );
         if (isOpen) {
-          // Frage und Anleitung beide anzeigen
+          const text = !answered
+            ? 'Führen Sie das Unternehmen allein? („Nein“ bei mehreren Partner:innen.)'
+            : 'Geben Sie hier das Jahresgehalt des/der Geschäftsführer:in in CHF an:';
           const info = e('tr',{ key:key+'-sub', className:'bg-gray-50' },
             e('td',{ colSpan:years.length+1, className:'px-2 py-2 text-right' },
-              e('p',{ className:'italic text-gray-700 mb-1' },
-                'Führen Sie das Unternehmen allein? („Nein“ bei mehreren Partner:innen.)'
-              ),
+              e('p',{ className:'italic text-gray-700 mb-1' },text),
               !answered && ['Ja','Nein'].map(opt=>
                 e('label',{ key:opt, className:'inline-flex items-center mr-4' },
                   e('input',{ type:'radio', name:'Einzelgeschäftsführung', value:opt,
@@ -168,10 +162,41 @@
                   }),
                   e('span',{ className:'ml-1' },opt)
                 )
-              ),
-              answered && e('p',{ className:'italic text-gray-700 mt-2' },
-                'Geben Sie hier das Jahresgehalt des/der Geschäftsführer:in in CHF an.'
               )
+            )
+          );
+          return [ info, main ];
+        }
+        return main;
+      }
+
+      // ─── Abschreibungen ───
+      if (key === 'Abschreibungen') {
+        const main = e('tr',{ key, className:isOpen?'bg-gray-50':'' },
+          e('td',{ className:'px-2 py-1 w-2/5 select-none' },
+            e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
+              isOpen?'▼':'▲'
+            ),
+            e('span',{ className:'font-medium' },label)
+          ),
+          years.map(y=>e('td',{ key:y, className:'px-1 py-1 text-right' },
+            selectedYears.includes(y)
+              ? e('input',{
+                  type:'text',
+                  className:'w-full border rounded px-1 text-right',
+                  inputMode:'numeric',
+                  value: formatNum(answers[`${key} ${y}`]),
+                  onKeyDown:ev=>ev.key==='Enter'&&ev.preventDefault(),
+                  onFocus:()=>!isOpen&&toggleRow(key),
+                  onChange:ev=>setField(key,y,ev.target.value)
+                })
+              : null
+          ))
+        );
+        if (isOpen) {
+          const info = e('tr',{ key:key+'-instr', className:'bg-gray-50' },
+            e('td',{ colSpan:years.length+1, className:'px-2 py-2 italic text-gray-700 text-right' },
+              'Abschreibungen (Wertminderungen von Anlagen, Maschinen und immateriellen Vermögenswerten wie Software oder Patenten):'
             )
           );
           return [ info, main ];
@@ -191,7 +216,8 @@
           selectedYears.includes(y)
             ? input
               ? e('input',{ 
-                  type:'text', className:'w-full border rounded px-1 text-right',
+                  type:'text',
+                  className:'w-full border rounded px-1 text-right',
                   inputMode:'numeric',
                   value:formatNum(answers[`${key} ${y}`]),
                   onKeyDown:ev=>ev.key==='Enter'&&ev.preventDefault(),
@@ -209,7 +235,7 @@
       );
     }
 
-    // 9) Tabelle rendern mit rechtsbündigen Überschriften
+    // 9) Tabelle rendern mit rechtsbündigen Jahres-Überschriften
     return e('div',{ className:'overflow-x-auto' },
       e('table',{ className:'table-fixed w-full text-sm border-collapse' },
         e('thead',{},
