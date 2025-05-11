@@ -12,6 +12,7 @@
       ? answers['Finance Years']
       : years;
 
+    // which rows are "open" (show explanation)
     const [openRows, setOpenRows] = useState(new Set());
 
     function toggleYear(year) {
@@ -22,23 +23,21 @@
     }
 
     function handleChange(key, year, raw) {
-      // strip any non-digit/comma/dot/minus
+      // allow only digits, comma, dot, minus
       const cleaned = (raw || '')
         .replace(/[^0-9\.\-,]/g, '')
-        // keep only first comma/dot for decimal
-        .replace(/(\..*?)\./g,'$1')
-        .replace(/(,.*?)\,/g,'$1');
+        .replace(/(\..*?)\./g, '$1')
+        .replace(/(,.*?)\,/g, '$1');
       setAnswers({
         ...answers,
         [`${key} ${year}`]: cleaned
       });
     }
 
-    // --- FIXED: always coerce to string first ---
     function parseNum(val) {
       const str = (val == null ? '' : String(val));
       const normalized = str
-        .replace(/\./g, '')    // remove thousands
+        .replace(/\./g, '')    // drop thousands
         .replace(',', '.');    // comma → decimal
       const n = parseFloat(normalized);
       return isNaN(n) ? 0 : n;
@@ -46,9 +45,9 @@
 
     function formatNum(val) {
       const n = parseNum(val);
-      return n === 0 && (val == null || val === '' || parseNum(val) === 0)
-        ? ''
-        : n.toLocaleString('de-CH');
+      // blank if original was blank
+      if ((val == null || val === '') && n === 0) return '';
+      return n.toLocaleString('de-CH');
     }
 
     // computations
@@ -56,7 +55,7 @@
       const rev  = parseNum(answers[`Umsatz ${y}`]);
       const ebit = parseNum(answers[`EBIT ${y}`]);
       return rev > 0
-        ? (ebit / rev * 100).toFixed(1) + '%'
+        ? Math.round((ebit / rev) * 100) + '%'
         : '';
     }
     function calcAdjustedEBIT(y) {
@@ -70,24 +69,24 @@
       return formatNum(adj + ceo);
     }
 
-    // explanations
+    // explanations text
     const explanations = {
-      'Umsatz':          'Ihr Gesamtumsatz im Jahr in CHF (ohne MwSt).',
-      'EBIT':            'Ergebnis vor Zinsen & Steuern, nach GF-Löhnen.',
-      'Abschreibungen':  'Jährliche Wertminderungen auf Anlagevermögen.',
-      'CEO-Saläre':      'Total ausgezahlte Löhne aller Geschäftsführer.',
-      'EBIT Anpassung':  'Korrekturen für außerordentliche Effekte.'
+      'Umsatz':         'Geben Sie Ihren Jahresumsatz (ohne MwSt) in CHF an.',
+      'EBIT':           'Ergebnis vor Zinsen & Steuern (nach GF-Löhnen).',
+      'Abschreibungen': 'Jährliche Wertminderungen auf Ihre Sach- und IMM-Güter.',
+      'CEO-Saläre':     'Summe aller ausgezahlten Löhne der Geschäftsführung.',
+      'EBIT Anpassung': 'Korrekturen für einmalige oder außerordentliche Effekte.'
     };
 
     const rows = [
-      { label:'Umsatz', key:'Umsatz',          isInput:true },
-      { label:'EBIT',   key:'EBIT',            isInput:true },
-      { label:'EBIT-Marge', key:'EBIT-Marge',  isInput:false, calc: calcEBITMargin },
-      { label:'Abschreibungen', key:'Abschreibungen', isInput:true },
-      { label:'CEO-Saläre', key:'CEO-Saläre', isInput:true },
-      { label:'EBIT Anpassung', key:'EBIT Anpassung', isInput:true },
-      { label:'EBIT angepasst', key:'EBIT angepasst', isInput:false, calc: calcAdjustedEBIT },
-      { label:'EBITC (EBIT + CEO)', key:'EBITC', isInput:false, calc: calcEBITC },
+      { label:'Umsatz',          key:'Umsatz',          isInput:true },
+      { label:'EBIT',            key:'EBIT',            isInput:true },
+      { label:'EBIT-Marge',      key:'EBIT-Marge',      isInput:false, calc:calcEBITMargin },
+      { label:'Abschreibungen',  key:'Abschreibungen',  isInput:true },
+      { label:'CEO-Saläre',      key:'CEO-Saläre',      isInput:true },
+      { label:'EBIT Anpassung',  key:'EBIT Anpassung',  isInput:true },
+      { label:'EBIT angepasst',  key:'EBIT angepasst',  isInput:false, calc:calcAdjustedEBIT },
+      { label:'EBITC (EBIT+CEO)',key:'EBITC',           isInput:false, calc:calcEBITC },
     ];
 
     function toggleRow(key) {
@@ -96,44 +95,30 @@
       setOpenRows(next);
     }
 
-    // build table header
+    // table header
     const header = e('tr', {},
-      e('th',{ className:'px-2 py-1 bg-gray-200 text-left' }, 'Posten'),
+      e('th', { className:'px-2 py-1 bg-gray-200 text-left' }, 'Posten'),
       ...years.map(y =>
-        e('th',{ key:y, className:'px-2 py-1 bg-gray-200 text-center' }, y)
+        e('th', { key:y, className:'px-2 py-1 bg-gray-200 text-center' }, y)
       )
     );
 
-    // build each row (and optional explanation)
+    // build body
     const body = [];
     rows.forEach(r => {
-      const isOpen = openRows.has(r.key);
-      if (isOpen && explanations[r.key]) {
-        body.push(
-          e('tr',{ key:r.key+'-exp' },
-            e('td',{
-                colSpan: years.length+1,
-                className:'bg-gray-50 px-3 py-1 text-sm text-gray-600 italic'
-              },
-              explanations[r.key]
-            )
-          )
-        );
-      }
+      // the main row
       body.push(
-        e('tr',{ key:r.key, className:'border-t' },
+        e('tr', { key:r.key, className:'border-t' },
           // label + toggle
-          e('td',{ className:'px-2 py-1 bg-gray-100 flex items-center' },
-            e('button',{
-                type:'button',
-                onClick:()=>toggleRow(r.key),
-                className:'mr-2 text-lg select-none'
-              },
-              isOpen ? '▼' : '▶'
-            ),
+          e('td', { className:'px-2 py-1 bg-gray-100 flex items-center' },
+            e('button', {
+              type:'button',
+              onClick:()=>toggleRow(r.key),
+              className:'mr-2 select-none'
+            }, openRows.has(r.key) ? '▼' : '▶'),
             e('span',{}, r.label)
           ),
-          // data cells
+          // values
           ...years.map(y =>
             e('td',{ key:y, className:'px-2 py-1 text-center' },
               selectedYears.includes(y)
@@ -153,11 +138,23 @@
           )
         )
       );
+
+      // explanation row *below* the inputs
+      if (openRows.has(r.key) && explanations[r.key]) {
+        body.push(
+          e('tr',{ key:r.key+'-exp' },
+            e('td',{
+              colSpan: years.length+1,
+              className:'bg-gray-50 px-3 py-1 text-sm text-gray-600 italic'
+            }, explanations[r.key])
+          )
+        );
+      }
     });
 
-    return e('div',{ className:'space-y-4' },
-      // year toggles
-      e('div',{ className:'flex gap-4' },
+    return e('div',{ className:'space-y-6' },
+      // year selectors
+      e('div',{ className:'flex gap-6' },
         years.map(y =>
           e('label',{ key:y, className:'flex items-center space-x-1' },
             e('input',{
@@ -169,7 +166,8 @@
           )
         )
       ),
-      // P&L table
+
+      // the P&L table
       e('table',{ className:'w-full table-auto border-collapse text-sm' },
         e('thead',{}, header),
         e('tbody',{}, ...body)
@@ -178,4 +176,4 @@
   }
 
   window.FinanceInput = FinanceInput;
-})(); 
+})();
