@@ -7,7 +7,7 @@
     const e = React.createElement;
     const years = [2023, 2024, 2025];
 
-    // 1) Default: alle Jahre vorauswählen
+    // Default: alle Jahre vorauswählen
     useEffect(() => {
       if (!Array.isArray(answers['Finance Years'])) {
         setAnswers({ ...answers, 'Finance Years': [...years] });
@@ -15,9 +15,10 @@
     }, []);
 
     const selectedYears = answers['Finance Years'] || [];
+    // Umsatz startet aufgeklappt
     const [openRow, setOpenRow] = useState('Umsatz');
 
-    // 2) Parsen & Formatieren
+    // Parsen & Formatieren
     function parseNum(val) {
       if (val == null) return null;
       const s = val.toString()
@@ -33,48 +34,40 @@
       return n == null ? '' : n.toLocaleString('de-CH');
     }
 
-    // 3) Abhängigkeiten
+    // Abhängigkeits-Flags
     const revC  = selectedYears.every(y => parseNum(answers[`Umsatz ${y}`]) != null);
-    const ceoQ  = answers['Einzelgeschäftsührung'] != null;
+    const ceoQ  = answers['Einzelgeschäftsführung'] != null;
     const ceoC  = revC && ceoQ && selectedYears.every(y => parseNum(answers[`CEO-Saläre ${y}`]) != null);
     const absC  = ceoC && selectedYears.every(y => parseNum(answers[`Abschreibungen ${y}`]) != null);
     const ebitC = absC && selectedYears.every(y => parseNum(answers[`EBIT ${y}`]) != null);
     const adjC  = ebitC && selectedYears.every(y => parseNum(answers[`EBIT Anpassung ${y}`]) != null);
 
-    // 4) Automatisches Weiter-Öffnen
-    useEffect(() => {
-      if (revC && openRow === 'Umsatz') setOpenRow('CEO-Saläre');
-    }, [revC, openRow]);
-    useEffect(() => {
-      if (ceoC && openRow === 'CEO-Saläre') setOpenRow('Abschreibungen');
-    }, [ceoC, openRow]);
-    useEffect(() => {
-      if (absC && openRow === 'Abschreibungen') setOpenRow('EBIT');
-    }, [absC, openRow]);
-    useEffect(() => {
-      if (ebitC && openRow === 'EBIT') setOpenRow('EBIT Anpassung');
-    }, [ebitC, openRow]);
+    // Automatisches Weiter-Öffnen
+    useEffect(() => { if (revC  && openRow==='Umsatz')           setOpenRow('CEO-Saläre'); }, [revC, openRow]);
+    useEffect(() => { if (ceoC  && openRow==='CEO-Saläre')       setOpenRow('Abschreibungen'); }, [ceoC, openRow]);
+    useEffect(() => { if (absC  && openRow==='Abschreibungen')   setOpenRow('EBIT'); }, [absC, openRow]);
+    useEffect(() => { if (ebitC && openRow==='EBIT')             setOpenRow('EBIT Anpassung'); }, [ebitC, openRow]);
 
-    // 5) Setter
+    // Setter
     function toggleRow(key) {
       setOpenRow(openRow === key ? null : key);
     }
     function setField(key, y, raw) {
       if (key === 'EBIT') {
         const rev = parseNum(answers[`Umsatz ${y}`]), val = parseNum(raw);
-        if (rev != null && val != null && val > rev) raw = rev.toString();
+        if (rev!=null && val!=null && val>rev) raw = rev.toString();
       }
       setAnswers({ ...answers, [`${key} ${y}`]: raw });
     }
     function setSingle(ans) {
-      setAnswers({ ...answers, 'Einzelgeschäftsührung': ans });
+      setAnswers({ ...answers, 'Einzelgeschäftsführung': ans });
     }
 
-    // 6) Kalkulationen
+    // Kalkulationen
     function calcEBITMargin(y) {
       const rev  = parseNum(answers[`Umsatz ${y}`]) || 0;
       const ebit = parseNum(answers[`EBIT ${y}`])   || 0;
-      return rev > 0 ? Math.round(ebit/rev*100) + '%' : '';
+      return rev>0 ? Math.round(ebit/rev*100)+'%' : '';
     }
     function calcAdjEBIT(y) {
       const ebit = parseNum(answers[`EBIT ${y}`])      || 0;
@@ -83,10 +76,10 @@
     }
     function calcEBITC(y) {
       const ceo = parseNum(answers[`CEO-Saläre ${y}`]) || 0;
-      return formatNum((calcAdjEBIT(y) + ceo).toString());
+      return formatNum((calcAdjEBIT(y)+ceo).toString());
     }
 
-    // 7) Reihen-Definition
+    // Reihen-Definition
     const rows = [
       { label:'Umsatz',           key:'Umsatz',         input:true,  show:()=>true   },
       { label:'CEO-Saläre',       key:'CEO-Saläre',     input:true,  show:()=>revC   },
@@ -98,27 +91,26 @@
       { label:'EBITC (EBIT+CEO)', key:'EBITC (EBIT+CEO)',input:false,show:()=>ebitC }
     ].filter(r => r.show());
 
-    // 8) Row-Renderer
+    // Row-Renderer
     function renderRow(r) {
       const { label, key, input } = r;
       const isOpen = openRow === key;
 
-      // ─── Umsatz ───
+      // Umsatz
       if (key === 'Umsatz') {
-        const main = e('tr',{ key, className: isOpen ? 'bg-gray-50' : '' },
+        const main = e('tr',{ key, className:isOpen?'bg-gray-50':'' },
           e('td',{ className:'px-2 py-1 w-2/5 select-none' },
             e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-              isOpen ? '▼' : '▲'
+              isOpen?'▼':'▲'
             ),
-            e('span',{ className:'font-medium' }, label)
+            e('span',{ className:'font-medium' },label)
           ),
-          years.map(y => e('td',{ key:y, className:'px-1 py-1 text-left' },
+          years.map(y=>e('td',{ key:y, className:'px-1 py-1 text-left' },
             selectedYears.includes(y)
               ? e('input',{ 
-                  type:'text',
-                  className:'w-full border rounded px-1',
+                  type:'text', className:'w-full border rounded px-1',
                   inputMode:'numeric',
-                  value: formatNum(answers[`${key} ${y}`]),
+                  value:formatNum(answers[`${key} ${y}`]),
                   onKeyDown:ev=>ev.key==='Enter'&&ev.preventDefault(),
                   onFocus:()=>!isOpen&&toggleRow(key),
                   onChange:ev=>setField(key,y,ev.target.value)
@@ -128,7 +120,7 @@
         );
         if (isOpen) {
           const info = e('tr',{ key:key+'-instr', className:'bg-gray-50' },
-            e('td',{ colSpan:years.length+1, className:'px-2 py-2 italic text-gray-700 text-left' },
+            e('td',{ colSpan:years.length+1, className:'px-2 py-2 italic text-gray-700 text-right' },
               'Jahresumsatz in CHF (ohne MWSt.)'
             )
           );
@@ -137,23 +129,22 @@
         return main;
       }
 
-      // ─── CEO-Saläre ───
+      // CEO-Saläre
       if (key === 'CEO-Saläre') {
-        const answered = answers['Einzelgeschäftsührung'] != null;
-        const main = e('tr',{ key, className: isOpen ? 'bg-gray-50' : '' },
+        const answered = answers['Einzelgeschäftsführung']!=null;
+        const main = e('tr',{ key, className:isOpen?'bg-gray-50':'' },
           e('td',{ className:'px-2 py-1 w-2/5 select-none' },
             e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-              isOpen ? '▼' : '▲'
+              isOpen?'▼':'▲'
             ),
-            e('span',{ className:'font-medium' }, label)
+            e('span',{ className:'font-medium' },label)
           ),
-          years.map(y => e('td',{ key:y, className:'px-1 py-1 text-left' },
+          years.map(y=>e('td',{ key:y, className:'px-1 py-1 text-left' },
             answered && selectedYears.includes(y)
               ? e('input',{
-                  type:'text',
-                  className:'w-full border rounded px-1',
+                  type:'text', className:'w-full border rounded px-1',
                   inputMode:'numeric',
-                  value: formatNum(answers[`${key} ${y}`]),
+                  value:formatNum(answers[`${key} ${y}`]),
                   onKeyDown:ev=>ev.key==='Enter'&&ev.preventDefault(),
                   onFocus:()=>!isOpen&&toggleRow(key),
                   onChange:ev=>setField(key,y,ev.target.value)
@@ -166,9 +157,9 @@
             ? 'Führen Sie das Unternehmen allein? („Nein“ bei mehreren Partner:innen.)'
             : 'Geben Sie hier das Jahresgehalt des/der Geschäftsführer:in in CHF an.';
           const info = e('tr',{ key:key+'-sub', className:'bg-gray-50' },
-            e('td',{ colSpan:years.length+1, className:'px-2 py-2 text-left' },
-              e('p',{ className:'italic text-gray-700 mb-1' }, text),
-              !answered && ['Ja','Nein'].map(opt =>
+            e('td',{ colSpan:years.length+1, className:'px-2 py-2 text-right' },
+              e('p',{ className:'italic text-gray-700 mb-1' },text),
+              !answered && ['Ja','Nein'].map(opt=>
                 e('label',{ key:opt, className:'inline-flex items-center mr-4' },
                   e('input',{ type:'radio', name:'Einzelgeschäftsführung', value:opt,
                     onChange:()=>setSingle(opt)
@@ -183,22 +174,21 @@
         return main;
       }
 
-      // ─── alle anderen ───
+      // alle anderen
       return e('tr',{ key },
         e('td',{ className:'px-2 py-1 w-2/5 select-none' },
           e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-            isOpen ? '▼' : '▲'
-          ),  
-          e('span',{ className:'font-medium' }, label)
+            isOpen?'▼':'▲'
+          ),
+          e('span',{ className:'font-medium' },label)
         ),
-        years.map(y => e('td',{ key:y, className:'px-1 py-1 text-left' },
+        years.map(y=>e('td',{ key:y, className:'px-1 py-1 text-left' },
           selectedYears.includes(y)
             ? input
-              ? e('input',{
-                  type:'text',
-                  className:'w-full border rounded px-1',
+              ? e('input',{ 
+                  type:'text', className:'w-full border rounded px-1',
                   inputMode:'numeric',
-                  value: formatNum(answers[`${key} ${y}`]),
+                  value:formatNum(answers[`${key} ${y}`]),
                   onKeyDown:ev=>ev.key==='Enter'&&ev.preventDefault(),
                   onFocus:()=>!isOpen&&toggleRow(key),
                   onChange:ev=>setField(key,y,ev.target.value)
@@ -214,14 +204,15 @@
       );
     }
 
-    // 9) Tabelle
+    // Tabelle rendern
     return e('div',{ className:'overflow-x-auto' },
       e('table',{ className:'table-fixed w-full text-sm border-collapse' },
         e('thead',{},
           e('tr',{},
             e('th',{ className:'px-2 py-1 text-left w-2/5' },'Posten'),
             ...years.map(y=>
-              e('th',{ key:y, className:'px-1 py-1 text-center w-1/5' }, y)
+              // jetzt linksbündig
+              e('th',{ key:y, className:'px-1 py-1 text-left w-1/5' },y)
             )
           )
         ),
