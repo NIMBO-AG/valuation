@@ -1,6 +1,6 @@
 // src/FinanceInput.js
 
-(function(){
+;(function(){
   const { useEffect, useState } = React;
 
   function FinanceInput({ answers, setAnswers }) {
@@ -15,19 +15,17 @@
     }, []);
 
     const selectedYears = answers['Finance Years'] || [];
-
-    // 2) State, welche Zeile aufgeklappt ist
     const [openRow, setOpenRow] = useState('Umsatz');
 
-    // 3) Helfer zum Parsen/Formatieren
+    // 2) Parsen & Formatieren (inkl. Apostrophen als Tausender)
     function parseNum(val) {
       if (val == null) return null;
-      const cleaned = val
-        .toString()
-        .replace(/\./g, '')
-        .replace(/,/g, '.')
-        .replace(/[^\d.\-]/g, '');
-      const f = parseFloat(cleaned);
+      const s = val.toString()
+        .replace(/['\u2019]/g, '')   // Schweizer Apostroph entfernen
+        .replace(/\s/g, '')          // Whitespace entfernen
+        .replace(/\./g, '')          // Punkte als Tausender entfernen
+        .replace(/,/g, '.');         // Komma→Dezimalpunkt
+      const f = parseFloat(s);
       return isNaN(f) ? null : f;
     }
     function formatNum(val) {
@@ -35,7 +33,7 @@
       return n == null ? '' : n.toLocaleString('de-CH');
     }
 
-    // 4) Completion-Flags
+    // 3) Abhängigkeits-Flags
     const revC  = selectedYears.every(y => parseNum(answers[`Umsatz ${y}`]) != null);
     const ceoQ  = answers['Einzelgeschäftsführung'] != null;
     const ceoC  = revC && ceoQ && selectedYears.every(y => parseNum(answers[`CEO-Saläre ${y}`]) != null);
@@ -43,15 +41,18 @@
     const ebitC = absC && selectedYears.every(y => parseNum(answers[`EBIT ${y}`]) != null);
     const adjC  = ebitC && selectedYears.every(y => parseNum(answers[`EBIT Anpassung ${y}`]) != null);
 
-    // 5) Umschalter & Setter
+    // 4) Setter-Funktionen
     function toggleRow(key) {
       setOpenRow(openRow === key ? null : key);
     }
     function setField(key, y, raw) {
+      // EBIT darf nicht größer sein als Umsatz
       if (key === 'EBIT') {
         const rev = parseNum(answers[`Umsatz ${y}`]);
         const val = parseNum(raw);
-        if (rev != null && val != null && val > rev) raw = rev.toString();
+        if (rev != null && val != null && val > rev) {
+          raw = rev.toString();
+        }
       }
       setAnswers({ ...answers, [`${key} ${y}`]: raw });
     }
@@ -59,14 +60,14 @@
       setAnswers({ ...answers, 'Einzelgeschäftsführung': ans });
     }
 
-    // 6) Kalkulationsfunktionen
+    // 5) Berechnungs-Hilfen
     function calcEBITMargin(y) {
       const rev  = parseNum(answers[`Umsatz ${y}`]) || 0;
       const ebit = parseNum(answers[`EBIT ${y}`])   || 0;
       return rev>0 ? Math.round(ebit/rev*100) + '%' : '';
     }
     function calcAdjEBIT(y) {
-      const ebit = parseNum(answers[`EBIT ${y}`])     || 0;
+      const ebit = parseNum(answers[`EBIT ${y}`])         || 0;
       const adj  = parseNum(answers[`EBIT Anpassung ${y}`]) || 0;
       return ebit + adj;
     }
@@ -75,7 +76,7 @@
       return formatNum((calcAdjEBIT(y) + ceo).toString());
     }
 
-    // 7) Reihen-Definition
+    // 6) Reihen-Definition
     const rows = [
       { label:'Umsatz',           key:'Umsatz',         input:true,  show:()=>true   },
       { label:'CEO-Saläre',       key:'CEO-Saläre',     input:true,  show:()=>revC   },
@@ -84,28 +85,60 @@
       { label:'EBIT-Marge',       key:'EBIT-Marge',     input:false, show:()=>ebitC  },
       { label:'EBIT Anpassung',   key:'EBIT Anpassung', input:true,  show:()=>ebitC  },
       { label:'EBIT angepasst',   key:'EBIT angepasst', input:false, show:()=>ebitC  },
-      { label:'EBITC (EBIT+CEO)', key:'EBITC (EBIT+CEO)',input:false, show:()=>ebitC }
+      { label:'EBITC (EBIT+CEO)', key:'EBITC (EBIT+CEO)',input:false,show:()=>ebitC }
     ].filter(r => r.show());
 
-    // 8) Einzelfall-Renderer
+    // 7) Row-Renderer
     function renderRow(r) {
       const { label, key, input } = r;
       const isOpen = openRow === key;
 
-      // 8a) Spezialfall CEO-Saläre
-      if (key === 'CEO-Saläre') {
-        const answered = answers['Einzelgeschäftsführung'] != null;
-
-        // → Haupt-Zeile
+      // --- Spezialfall Umsatz: Instruktion im Sub-Row ---
+      if (key === 'Umsatz') {
         const mainRow = e('tr',{ key },
-          e('td',{ className:'bg-gray-100 px-2 py-1 w-56 select-none' },
+          e('td',{ className:'bg-gray-100 px-2 py-1 w-2/5 select-none' },
             e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-              isOpen ? '▼' : '▶'
+              isOpen?'▼':'▶'
             ),
             e('span',{ className:'font-medium' }, label)
           ),
           years.map(y => e('td',{ key:y, className:'px-1 py-1 text-right' },
-            // nur anzeigen, wenn bereits Ja/Nein beantwortet wurde
+            selectedYears.includes(y)
+              ? e('input',{ 
+                  type:'text',
+                  className:'w-full border rounded px-1',
+                  inputMode:'numeric',
+                  value: formatNum(answers[`${key} ${y}`]),
+                  onKeyDown: ev=>{ if(ev.key==='Enter') ev.preventDefault(); },
+                  onFocus: ()=>{ if(!isOpen) toggleRow(key); },
+                  onChange: ev=>setField(key,y,ev.target.value)
+                })
+              : null
+          ))
+        );
+        if (isOpen) {
+          const subRow = e('tr',{ key:key+'-instr' },
+            e('td',{ colSpan:years.length+1, className:'bg-gray-50 px-2 py-2 italic text-gray-700' },
+              'Jahresumsatz in CHF (ohne MWSt.)'
+            )
+          );
+          return [ mainRow, subRow ];
+        }
+        return mainRow;
+      }
+
+      // --- Spezialfall CEO-Saläre ---
+      if (key === 'CEO-Saläre') {
+        const answered = answers['Einzelgeschäftsführung'] != null;
+
+        const mainRow = e('tr',{ key },
+          e('td',{ className:'bg-gray-100 px-2 py-1 w-2/5 select-none' },
+            e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
+              isOpen?'▼':'▶'
+            ),
+            e('span',{ className:'font-medium' }, label)
+          ),
+          years.map(y => e('td',{ key:y, className:'px-1 py-1 text-right' },
             answered && selectedYears.includes(y)
               ? e('input',{
                   type:'text',
@@ -114,13 +147,12 @@
                   value: formatNum(answers[`${key} ${y}`]),
                   onKeyDown: ev=>{ if(ev.key==='Enter') ev.preventDefault(); },
                   onFocus: ()=>{ if(!isOpen) toggleRow(key); },
-                  onChange: ev=> setField(key,y,ev.target.value)
+                  onChange: ev=>setField(key,y,ev.target.value)
                 })
-              : e('div',{}, '\u00a0')  // Leerzelle
+              : e('div',{}, '\u00a0')
           ))
         );
 
-        // → Sub-Zeile: Frage oder Instruktion
         if (isOpen) {
           const text = !answered
             ? 'Führen Sie das Unternehmen allein? (Wählen Sie „Nein“ bei mehreren Partner:innen.)'
@@ -129,7 +161,6 @@
           const subRow = e('tr',{ key:key+'-sub' },
             e('td',{ colSpan:years.length+1, className:'bg-gray-50 px-2 py-2' },
               e('p',{ className:'italic text-gray-700 mb-1' }, text),
-              // nur Radiobuttons wenn noch unbeantwortet
               !answered && ['Ja','Nein'].map(opt =>
                 e('label',{ key:opt, className:'inline-flex items-center mr-4' },
                   e('input',{ type:'radio',
@@ -144,22 +175,29 @@
           );
           return [ mainRow, subRow ];
         }
-
         return mainRow;
       }
 
-      // 8b) Alle anderen Zeilen wie gehabt
-      const mainRow = e('tr',{ key },
-        e('td',{ className:'bg-gray-100 px-2 py-1 w-56 select-none' },
+      // --- alle anderen Zeilen ---
+      return e('tr',{ key },
+        e('td',{ className:'bg-gray-100 px-2 py-1 w-2/5 select-none' },
           e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-            isOpen ? '▼' : '▶'
+            isOpen?'▼':'▶'
           ),
-          e('span',{ className:'font-medium' },label)
+          e('span',{ className:'font-medium' }, label)
         ),
         years.map(y => e('td',{ key:y, className:'px-1 py-1 text-right' },
           selectedYears.includes(y)
             ? input
-              ? e('input',{ /* … input wie vorher … */ })
+              ? e('input',{
+                  type:'text',
+                  className:'w-full border rounded px-1',
+                  inputMode:'numeric',
+                  value: formatNum(answers[`${key} ${y}`]),
+                  onKeyDown: ev=>{ if(ev.key==='Enter') ev.preventDefault(); },
+                  onFocus: ()=>{ if(!isOpen) toggleRow(key); },
+                  onChange: ev=>setField(key,y,ev.target.value)
+                })
               : e('span',{}, 
                   key==='EBIT-Marge'       ? calcEBITMargin(y)
                 : key==='EBIT angepasst'     ? formatNum(calcAdjEBIT(y).toString())
@@ -169,16 +207,17 @@
             : null
         ))
       );
-      return mainRow;
     }
 
-    // 9) Gesamttabelle rendern
-    return e('div',{ className:'overflow-x-auto' },
-      e('table',{ className:'table-auto w-full text-sm border-collapse' },
-        e('thead',{}, 
+    // 8) Tabelle rendern
+    return e('div',{ className:'table-responsive' },
+      e('table',{ className:'table-fixed w-full text-sm border-collapse' },
+        e('thead',{},
           e('tr',{},
-            e('th',{ className:'bg-gray-200 px-2 py-1 text-left w-56' },'Posten'),
-            ...years.map(y=> e('th',{ key:y, className:'bg-gray-200 px-1 py-1' }, y))
+            e('th',{ className:'bg-gray-200 px-2 py-1 text-left w-2/5' },'Posten'),
+            ...years.map(y=>
+              e('th',{ key:y, className:'bg-gray-200 px-1 py-1 text-center w-1/5' }, y)
+            )
           )
         ),
         e('tbody',{}, rows.flatMap(r=>renderRow(r)))
