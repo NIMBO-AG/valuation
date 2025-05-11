@@ -1,200 +1,218 @@
 // src/FinanceInput.js
 
-function FinanceInput({ answers, setAnswers }) {
-  const e = React.createElement;
-  const years = [2023, 2024, 2025];
+(function(){
+  const { useState, useEffect } = React;
 
-  // 1) Wenn noch nicht gesetzt, alle Jahre vorauswählen
-  React.useEffect(() => {
-    if (!Array.isArray(answers['Finance Years'])) {
-      setAnswers({ ...answers, 'Finance Years': [...years] });
-    }
-  }, []);
-
-  const selectedYears = answers['Finance Years'] || [];
-
-  // 2) State, welche Zeile aufgeklappt ist
-  const [openRow, setOpenRow] = React.useState('Umsatz');
-
-  // 3) Helfer zum Parsen/Formatieren
+  // Hilfsfunktionen für Formatierung
+  function formatNum(x) {
+    if (x == null || x === '') return '';
+    const n = Number(x);
+    if (isNaN(n)) return '';
+    return n.toLocaleString('de-CH');
+  }
   function parseNum(val) {
-    if (typeof val !== 'string') return null;
-    const cleaned = val
-      .replace(/\./g, '')   // Punkte (Tsd.-Trenner) entfernen
-      .replace(/,/g, '.')   // Komma → Dezimalpunkt
-      .replace(/[^\d.\-]/g, '');
+    if (val == null) return '';
+    const cleaned = val.toString().replace(/\./g, '').replace(/,/g, '.');
     const f = parseFloat(cleaned);
-    return isNaN(f) ? null : f;
-  }
-  function formatNum(val) {
-    const n = parseNum(val);
-    return n === null ? '' : n.toLocaleString('de-CH');
+    return isNaN(f) ? '' : f;
   }
 
-  // 4) Completion-Flags
-  const revC   = selectedYears.every(y => parseNum(answers[`Umsatz ${y}`]) !== null);
-  const ceoQ   = answers['Einzelgeschäftsführung'] !== undefined;
-  const ceoC   = revC && ceoQ && selectedYears.every(y => parseNum(answers[`CEO-Saläre ${y}`]) !== null);
-  const absC   = ceoC && selectedYears.every(y => parseNum(answers[`Abschreibungen ${y}`]) !== null);
-  const ebitC  = absC && selectedYears.every(y => parseNum(answers[`EBIT ${y}`]) !== null);
-  const adjC   = ebitC && selectedYears.every(y => parseNum(answers[`EBIT Anpassung ${y}`]) !== null);
-
-  // 5) Umschalter & Setter
-  function toggleRow(key) {
-    setOpenRow(openRow === key ? null : key);
-  }
-  function setField(key, y, raw) {
-    // EBIT darf nicht > Umsatz sein
-    if (key === 'EBIT') {
-      const rev = parseNum(answers[`Umsatz ${y}`]);
-      const val = parseNum(raw);
-      if (rev !== null && val !== null && val > rev) {
-        raw = rev.toString();
+  function FinanceInput({ answers, setAnswers }) {
+    const e = React.createElement;
+    const yearsAll = [2023, 2024, 2025];
+    // 1) Ausgewählte Jahre (default alle)
+    const selectedYears = answers['Finance Years'] || yearsAll;
+    useEffect(() => {
+      if (!answers['Finance Years']) {
+        setAnswers({ ...answers, 'Finance Years': yearsAll });
       }
+    }, []);
+
+    function toggleYear(y) {
+      const arr = answers['Finance Years'] || [];
+      const upd = arr.includes(y)
+        ? arr.filter(z => z !== y)
+        : [...arr, y];
+      setAnswers({ ...answers, 'Finance Years': upd });
     }
-    setAnswers({ ...answers, [`${key} ${y}`]: raw });
-  }
-  function setSingle(ans) {
-    setAnswers({ ...answers, 'Einzelgeschäftsführung': ans });
-  }
 
-  // 6) Kalkulations­funktionen
-  function calcEBITMargin(y) {
-    const rev  = parseNum(answers[`Umsatz ${y}`]);
-    const ebit = parseNum(answers[`EBIT ${y}`]);
-    return rev && ebit !== null
-      ? Math.round((ebit/rev)*100) + '%'
-      : '';
-  }
-  function calcAdjEBIT(y) {
-    const ebit = parseNum(answers[`EBIT ${y}`])     || 0;
-    const adj  = parseNum(answers[`EBIT Anpassung ${y}`]) || 0;
-    return ebit + adj;
-  }
-  function calcEBITC(y) {
-    const ceo = parseNum(answers[`CEO-Saläre ${y}`]) || 0;
-    return formatNum((calcAdjEBIT(y) + ceo).toString());
-  }
+    // 2) Block-Expansion (nur einer offen)
+    const [openBlock, setOpenBlock] = useState('Umsatz');
 
-  // 7) Reihen-Definition mit Abhängigkeiten
-  const rows = [
-    { label:'Umsatz',           key:'Umsatz',         input:true,  show:()=>true         },
-    { label:'CEO-Saläre',       key:'CEO-Saläre',     input:true,  show:()=>revC        },
-    { label:'Abschreibungen',   key:'Abschreibungen', input:true,  show:()=>ceoC        },
-    { label:'EBIT',             key:'EBIT',           input:true,  show:()=>absC        },
-    { label:'EBIT-Marge',       key:'EBIT-Marge',     input:false, show:()=>ebitC       },
-    { label:'EBIT Anpassung',   key:'EBIT Anpassung', input:true,  show:()=>ebitC       },
-    { label:'EBIT angepasst',   key:'EBIT angepasst', input:false, show:()=>ebitC       },
-    { label:'EBITC (EBIT+CEO)', key:'EBITC (EBIT+CEO)',input:false,show:()=>ebitC       }
-  ].filter(r => r.show());
+    function open(key) {
+      setOpenBlock(key);
+    }
 
-  // 8) Renderer
-  function renderRow(r) {
-    const { label, key, input } = r;
-    const isOpen = openRow === key;
+    // 3) CEO-Sequenz-Logik
+    const multiple = answers['MultipleCEOs'];       // "Ja" | "Nein"
+    const countCEO = answers['CEO Count'];          // Zahl
+    const stepCEO = (() => {
+      if (multiple === undefined)       return 'question';
+      if (multiple === 'Ja' && !countCEO) return 'count';
+      return 'salary';
+    })();
 
-    // — Spezialfall CEO-Saläre **BEVOR** beantwortet —
-    if (key==='CEO-Saläre' && revC && answers['Einzelgeschäftsführung']===undefined) {
-      return e('tr',{ key:key+'-ask' },
-        // linke Zelle, etwas breiter
-        e('td',{ className:'bg-gray-100 px-2 py-1 w-56 select-none' },
-          e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-            isOpen?'▼':'▶'
-          ),
-          e('span',{ className:'font-medium' },label)
-        ),
-        // rechte Zelle mit Frage (über alle Jahres-Spalten)
-        e('td',{ colSpan:years.length, className:'bg-gray-50 px-2 py-2' },
-          e('p',{ className:'italic text-gray-700 mb-1' },
-            'Wird Ihr Unternehmen von genau einer Person geführt?'
-          ),
-          ['Ja','Nein'].map(opt =>
-            e('label',{ key:opt, className:'inline-flex items-center mr-4' },
-              e('input',{ type:'radio',
-                name:'Einzelgeschäftsführung',
-                value:opt,
-                onChange:()=>setSingle(opt)
+    // 4) Helfer für Eingaben
+    function onChange(key, year, raw) {
+      const num = parseNum(raw);
+      setAnswers({ ...answers, [`${key} ${year}`]: num });
+    }
+    function onAnswer(key, val) {
+      setAnswers({ ...answers, [key]: val });
+    }
+
+    // 5) Berechnungen
+    function calcMargin(y) {
+      const rev = answers[`Umsatz ${y}`] || 0;
+      const ebt = answers[`EBIT ${y}`]   || 0;
+      return rev > 0 ? Math.round((ebt / rev) * 100) + '%' : '';
+    }
+
+    // Aufbau: Tabelle mit Kopf + Körper
+    return e('div', { className: 'space-y-4' },
+      // ─── Jahr-Auswahl ─────────────────────────────────────────────
+      e('div', {},
+        e('label', { className: 'font-medium' }, 'Welche Jahre sollen berücksichtigt werden?'),
+        e('div', { className: 'flex gap-4 mt-1' },
+          yearsAll.map(y =>
+            e('label', { key: y, className: 'flex items-center gap-1' },
+              e('input', {
+                type:     'checkbox',
+                checked:  selectedYears.includes(y),
+                onChange: () => toggleYear(y)
               }),
-              e('span',{ className:'ml-1' },opt)
+              y
             )
           )
         )
-      );
-    }
-
-    // — normale Zeile —
-    const mainRow = e('tr',{ key },
-      e('td',{ className:'bg-gray-100 px-2 py-1 w-56 select-none' },
-        e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-          isOpen?'▼':'▶'
-        ),
-        e('span',{ className:'font-medium' },label)
       ),
-      years.map(y => e('td',{ key:y, className:'px-1 py-1 text-right' },
-        selectedYears.includes(y)
-          ? input
-            ? e('input',{
-                type:'text',
-                className:'w-full border rounded px-1',
-                inputMode:'numeric',
-                value: formatNum(answers[`${key} ${y}`]),
-                onKeyDown:ev=>{ if(ev.key==='Enter')ev.preventDefault(); },
-                onFocus:()=>{ if(!isOpen) toggleRow(key); },
-                onChange:ev=>setField(key,y,ev.target.value)
-              })
-            : e('span',{}, key==='EBIT-Marge'
-                ? calcEBITMargin(y)
-                : key==='EBIT angepasst'
-                  ? calcAdjEBIT(y)
-                  : key==='EBITC (EBIT+CEO)'
-                    ? calcEBITC(y)
-                    : ''
+
+      // ─── P&L Tabelle ─────────────────────────────────────────────
+      e('table', { className: 'w-full table-auto border-collapse text-sm' },
+        // Kopfzeile
+        e('thead', {
+          className: 'bg-gray-100'
+        }, e('tr', {},
+          e('th', { className: 'px-2 py-1 text-left' }, 'Posten'),
+          selectedYears.map(y =>
+            e('th', { key: y, className: 'px-2 py-1' }, y)
+          )
+        )),
+        // Körper
+        e('tbody', {},
+          // Umsatz-Block
+          eRow('Umsatz',
+            stepCheck('Umsatz'),
+            selectedYears.map(y => inputCell('Umsatz', y)),
+            e('tr', {}, e('td', {
+              colSpan: 1 + selectedYears.length,
+              className: 'px-2 py-1 italic text-gray-600 text-sm'
+            }, 'Jahresumsatz in CHF (ohne MwSt).'))
+          ),
+
+          // CEO-Block
+          eRow('CEO-Saläre',
+            stepCheck('CEO-Saläre'),
+            // je nach Step verschiedene Inhalte:
+            (stepCEO === 'question') ? e('tr', { key:'q', className:'!bg-white' },
+              e('td',{ colSpan:1 + selectedYears.length, className:'px-2 py-2 text-gray-700 italic' },
+                'Wird Ihr Unternehmen von mehreren aktiven Geschäftsführer:innen oder Partner:innen geführt? ' +
+                'Bei „Nein“ erfolgt die Eingabe eines einzigen Salärs.'
+              ),
+              e('td',{ colSpan:1 + selectedYears.length, className:'px-2 pb-2' },
+                e('div',{ className:'flex gap-4' },
+                  ['Nein','Ja'].map(opt =>
+                    e('label',{ key:opt, className:'flex items-center gap-1' },
+                      e('input',{ type:'radio',
+                        name:'MultipleCEOs',
+                        checked: multiple===opt,
+                        onChange: ()=> onAnswer('MultipleCEOs', opt)
+                      }),
+                      opt
+                    )
+                  )
+                )
               )
-          : null
-      ))
+            )
+            : (stepCEO === 'count') ? e('tr',{ key:'c', className:'!bg-white' },
+              e('td',{ colSpan:1 + selectedYears.length, className:'px-2 py-2 text-gray-700 italic' },
+                'Wie viele Geschäftsführer:innen/Partner:innen sind es insgesamt?'
+              ),
+              e('td',{ colSpan:1 + selectedYears.length, className:'px-2 pb-2' },
+                e('input',{
+                  type:'number',
+                  min:1,
+                  value: countCEO || '',
+                  onChange: ev => onAnswer('CEO Count', parseInt(ev.target.value) || ''),
+                  className:'w-24 border rounded p-1'
+                })
+              )
+            )
+            : // stepCEO === 'salary'
+              selectedYears.map(y => inputCell('CEO-Saläre', y))
+          ),
+
+          // EBIT-Block
+          eRow('EBIT',
+            stepCheck('EBIT'),
+            selectedYears.map(y => inputCell('EBIT', y))
+          ),
+
+          // EBIT-Marge
+          eSimpleRow('EBIT-Marge',
+            selectedYears.map(y => e('td',{ key:y, className:'px-2 py-1' }, calcMargin(y) ))
+          )
+        )
+      )
     );
 
-    // — Zusatz-Reihe: Frage dort **NACH** der Antwort im Unterbereich —
-    if (key==='CEO-Saläre' && isOpen && revC && answers['Einzelgeschäftsführung']!==undefined) {
-      const colspan = years.length + 1;
-      const subRow = e('tr',{ key:key+'-sub' },
-        e('td',{ colSpan:colspan, className:'px-2 py-2 bg-gray-50' },
-          e('p',{ className:'italic text-gray-700 mb-1' },
-            'Wird Ihr Unternehmen von genau einer Person geführt?'
-          ),
-          ['Ja','Nein'].map(opt =>
-            e('label',{ key:opt, className:'inline-flex items-center mr-4' },
-              e('input',{ type:'radio',
-                name:'Einzelgeschäftsführung',
-                value:opt,
-                checked: answers['Einzelgeschäftsführung']===opt,
-                onChange:()=>setSingle(opt)
-              }),
-              e('span',{ className:'ml-1' },opt)
-            )
-          )
-        )
-      );
-      return [ mainRow, subRow ];
+    // ─── Hilfs-Renderer ────────────────────────────────────────────
+
+    function stepCheck(key) {
+      return e('td', {
+        className: 'px-2 py-1 cursor-pointer',
+        onClick:   () => open(key)
+      }, e('span', {
+        className: 'inline-block transform ' +
+          (openBlock === key ? 'rotate-90' : 'rotate-0')
+      }, '▶'));
     }
 
-    return mainRow;
+    function inputCell(metric, year) {
+      const val = answers[`${metric} ${year}`] ?? '';
+      return e('td', { key: year, className: 'px-1 py-1' },
+        openBlock === metric
+          ? e('input', {
+              type:      'text',
+              inputMode: 'numeric',
+              onKeyDown: ev => ev.key === 'Enter' && ev.preventDefault(),
+              value:     formatNum(val),
+              onChange:  ev => onChange(metric, year, ev.target.value),
+              className: 'w-full border rounded px-1 py-1 text-right'
+            })
+          : null
+      );
+    }
+
+    function eRow(metric, toggleTd, ...children) {
+      return e(React.Fragment, { key: metric },
+        e('tr', { className: 'bg-gray-50' },
+          toggleTd,
+          children.length ? children[0].props.children.map((td,i)=>
+            // children[0] in this usage is array of tds
+            td
+          ) : null
+        )
+      );
+    }
+
+    function eSimpleRow(label, cells) {
+      return e('tr', { key: label, className:'!bg-white' },
+        e('td',{ className:'px-2 py-1 italic text-gray-600' }, label),
+        ...cells
+      );
+    }
   }
 
-  // 9) Gesamttabelle rendern
-  return e('div',{ className:'overflow-x-auto' },
-    e('table',{ className:'table-auto w-full text-sm border-collapse' },
-      e('thead',{},
-        e('tr',{},
-          e('th',{ className:'bg-gray-200 px-2 py-1 text-left w-56' },'Posten'),
-          ...years.map(y=>
-            e('th',{ key:y, className:'bg-gray-200 px-1 py-1' },y)
-          )
-        )
-      ),
-      e('tbody',{}, rows.flatMap(r=>renderRow(r)))
-    )
-  );
-}
-
-window.FinanceInput = FinanceInput;
+  window.FinanceInput = FinanceInput;
+})();
