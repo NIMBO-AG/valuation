@@ -7,15 +7,13 @@
     const e = React.createElement;
     const years = [2023, 2024, 2025];
 
-    // default all years selected if none in answers yet
+    // default all years selected if none stored yet
     const selectedYears = Array.isArray(answers['Finance Years'])
       ? answers['Finance Years']
       : years;
 
-    // which rows are expanded?
     const [openRows, setOpenRows] = useState(new Set());
 
-    // toggle a year checkbox
     function toggleYear(year) {
       const next = selectedYears.includes(year)
         ? selectedYears.filter(y => y !== year)
@@ -23,24 +21,32 @@
       setAnswers({ ...answers, 'Finance Years': next });
     }
 
-    // store raw numeric (no formatting) as string
     function handleChange(key, year, raw) {
+      // strip any non-digit/comma/dot/minus
+      const cleaned = (raw || '')
+        .replace(/[^0-9\.\-,]/g, '')
+        // keep only first comma/dot for decimal
+        .replace(/(\..*?)\./g,'$1')
+        .replace(/(,.*?)\,/g,'$1');
       setAnswers({
         ...answers,
-        [`${key} ${year}`]: raw.replace(/[^\d\-]/g, '')
+        [`${key} ${year}`]: cleaned
       });
     }
 
-    // parse German-decimal or integer
+    // --- FIXED: always coerce to string first ---
     function parseNum(val) {
-      const n = parseFloat(val.toString().replace(/\./g, '').replace(',', '.'));
+      const str = (val == null ? '' : String(val));
+      const normalized = str
+        .replace(/\./g, '')    // remove thousands
+        .replace(',', '.');    // comma → decimal
+      const n = parseFloat(normalized);
       return isNaN(n) ? 0 : n;
     }
 
-    // format as German thousands
     function formatNum(val) {
       const n = parseNum(val);
-      return isNaN(n)
+      return n === 0 && (val == null || val === '' || parseNum(val) === 0)
         ? ''
         : n.toLocaleString('de-CH');
     }
@@ -64,16 +70,15 @@
       return formatNum(adj + ceo);
     }
 
-    // explanations for each row
+    // explanations
     const explanations = {
-      'Umsatz':          'Ihr Gesamtumsatz im Jahr in CHF, exkl. MwSt.',
-      'EBIT':            'Ergebnis vor Zinsen und Steuern (nach Geschäftsführerlöhnen).',
-      'Abschreibungen':  'Wertminderungen auf Anlage- und immaterielle Vermögen.',
-      'CEO-Saläre':      'Total ausgezahlte Löhne aller Geschäftsführer pro Jahr.',
-      'EBIT Anpassung':  'Manuelle Korrekturen für außerordentliche Effekte.',
+      'Umsatz':          'Ihr Gesamtumsatz im Jahr in CHF (ohne MwSt).',
+      'EBIT':            'Ergebnis vor Zinsen & Steuern, nach GF-Löhnen.',
+      'Abschreibungen':  'Jährliche Wertminderungen auf Anlagevermögen.',
+      'CEO-Saläre':      'Total ausgezahlte Löhne aller Geschäftsführer.',
+      'EBIT Anpassung':  'Korrekturen für außerordentliche Effekte.'
     };
 
-    // row definitions in order
     const rows = [
       { label:'Umsatz', key:'Umsatz',          isInput:true },
       { label:'EBIT',   key:'EBIT',            isInput:true },
@@ -85,28 +90,24 @@
       { label:'EBITC (EBIT + CEO)', key:'EBITC', isInput:false, calc: calcEBITC },
     ];
 
-    // toggle a single row open/closed
     function toggleRow(key) {
       const next = new Set(openRows);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      next.has(key) ? next.delete(key) : next.add(key);
       setOpenRows(next);
     }
 
-    // build header
+    // build table header
     const header = e('tr', {},
-      e('th',{className:'px-2 py-1 bg-gray-200 text-left'}, 'Posten'),
+      e('th',{ className:'px-2 py-1 bg-gray-200 text-left' }, 'Posten'),
       ...years.map(y =>
-        e('th',{ key:y, className:'px-2 py-1 bg-gray-200 text-center'}, y)
+        e('th',{ key:y, className:'px-2 py-1 bg-gray-200 text-center' }, y)
       )
     );
 
-    // build each data row (and optional explanation row)
+    // build each row (and optional explanation)
     const body = [];
     rows.forEach(r => {
       const isOpen = openRows.has(r.key);
-
-      // add an explanation row if open
       if (isOpen && explanations[r.key]) {
         body.push(
           e('tr',{ key:r.key+'-exp' },
@@ -119,40 +120,34 @@
           )
         );
       }
-
-      // then the actual data row
       body.push(
         e('tr',{ key:r.key, className:'border-t' },
           // label + toggle
-          e('td',{
-              className:'px-2 py-1 bg-gray-100 flex items-center'
-            },
+          e('td',{ className:'px-2 py-1 bg-gray-100 flex items-center' },
             e('button',{
                 type:'button',
                 onClick:()=>toggleRow(r.key),
-                className:'mr-2 text-lg leading-none select-none'
+                className:'mr-2 text-lg select-none'
               },
               isOpen ? '▼' : '▶'
             ),
             e('span',{}, r.label)
           ),
-
-          // one cell per year
+          // data cells
           ...years.map(y =>
             e('td',{ key:y, className:'px-2 py-1 text-center' },
               selectedYears.includes(y)
-                ? r.isInput
-                  // editable
-                  ? e('input',{
-                      type:'text',
-                      inputMode:'numeric',
-                      className:'w-24 border rounded px-1 text-right',
-                      value: formatNum(answers[`${r.key} ${y}`]||''),
-                      onChange:ev=>handleChange(r.key,y,ev.target.value),
-                      onKeyDown:ev=>{ if(ev.key==='Enter') ev.preventDefault(); }
-                    })
-                  // computed
-                  : e('span',{}, r.calc(y))
+                ? (r.isInput
+                    ? e('input',{
+                        type:'text',
+                        inputMode:'numeric',
+                        className:'w-24 border rounded px-1 text-right',
+                        value: formatNum(answers[`${r.key} ${y}`]),
+                        onChange:ev=>handleChange(r.key,y,ev.target.value),
+                        onKeyDown:ev=>{ if(ev.key==='Enter') ev.preventDefault(); }
+                      })
+                    : e('span',{}, r.calc(y))
+                  )
                 : null
             )
           )
@@ -161,7 +156,7 @@
     });
 
     return e('div',{ className:'space-y-4' },
-      // year selectors
+      // year toggles
       e('div',{ className:'flex gap-4' },
         years.map(y =>
           e('label',{ key:y, className:'flex items-center space-x-1' },
