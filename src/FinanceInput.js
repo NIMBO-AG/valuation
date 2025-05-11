@@ -1,145 +1,186 @@
 // src/FinanceInput.js
 
-function FinanceInput({ answers, setAnswers }) {
-  const e = React.createElement;
-  const years = [2023, 2024, 2025];
+(function() {
+  const { useState } = React;
 
-  // if the user hasn't yet chosen any years, default to all three
-  const selectedYears = Array.isArray(answers['Finance Years'])
-    ? answers['Finance Years']
-    : years;
+  function FinanceInput({ answers, setAnswers }) {
+    const e = React.createElement;
+    const years = [2023, 2024, 2025];
 
-  function toggleYear(year) {
-    const next = selectedYears.includes(year)
-      ? selectedYears.filter(y => y !== year)
-      : [...selectedYears, year];
-    setAnswers({ ...answers, 'Finance Years': next });
-  }
+    // default all years selected if none in answers yet
+    const selectedYears = Array.isArray(answers['Finance Years'])
+      ? answers['Finance Years']
+      : years;
 
-  function handleChange(key, year, val) {
-    // store raw string; we'll format it when we display
-    setAnswers({ ...answers, [`${key} ${year}`]: val });
-  }
+    // which rows are expanded?
+    const [openRows, setOpenRows] = useState(new Set());
 
-  function parseNum(val) {
-    // parse either "." or "," decimals
-    const n = parseFloat(
-      typeof val === 'string'
-        ? val.replace(',', '.')
-        : val
+    // toggle a year checkbox
+    function toggleYear(year) {
+      const next = selectedYears.includes(year)
+        ? selectedYears.filter(y => y !== year)
+        : [...selectedYears, year];
+      setAnswers({ ...answers, 'Finance Years': next });
+    }
+
+    // store raw numeric (no formatting) as string
+    function handleChange(key, year, raw) {
+      setAnswers({
+        ...answers,
+        [`${key} ${year}`]: raw.replace(/[^\d\-]/g, '')
+      });
+    }
+
+    // parse German-decimal or integer
+    function parseNum(val) {
+      const n = parseFloat(val.toString().replace(/\./g, '').replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    }
+
+    // format as German thousands
+    function formatNum(val) {
+      const n = parseNum(val);
+      return isNaN(n)
+        ? ''
+        : n.toLocaleString('de-CH');
+    }
+
+    // computations
+    function calcEBITMargin(y) {
+      const rev  = parseNum(answers[`Umsatz ${y}`]);
+      const ebit = parseNum(answers[`EBIT ${y}`]);
+      return rev > 0
+        ? (ebit / rev * 100).toFixed(1) + '%'
+        : '';
+    }
+    function calcAdjustedEBIT(y) {
+      const ebit = parseNum(answers[`EBIT ${y}`]);
+      const adj  = parseNum(answers[`EBIT Anpassung ${y}`]);
+      return formatNum(ebit + adj);
+    }
+    function calcEBITC(y) {
+      const adj = parseNum(calcAdjustedEBIT(y));
+      const ceo = parseNum(answers[`CEO-Saläre ${y}`]);
+      return formatNum(adj + ceo);
+    }
+
+    // explanations for each row
+    const explanations = {
+      'Umsatz':          'Ihr Gesamtumsatz im Jahr in CHF, exkl. MwSt.',
+      'EBIT':            'Ergebnis vor Zinsen und Steuern (nach Geschäftsführerlöhnen).',
+      'Abschreibungen':  'Wertminderungen auf Anlage- und immaterielle Vermögen.',
+      'CEO-Saläre':      'Total ausgezahlte Löhne aller Geschäftsführer pro Jahr.',
+      'EBIT Anpassung':  'Manuelle Korrekturen für außerordentliche Effekte.',
+    };
+
+    // row definitions in order
+    const rows = [
+      { label:'Umsatz', key:'Umsatz',          isInput:true },
+      { label:'EBIT',   key:'EBIT',            isInput:true },
+      { label:'EBIT-Marge', key:'EBIT-Marge',  isInput:false, calc: calcEBITMargin },
+      { label:'Abschreibungen', key:'Abschreibungen', isInput:true },
+      { label:'CEO-Saläre', key:'CEO-Saläre', isInput:true },
+      { label:'EBIT Anpassung', key:'EBIT Anpassung', isInput:true },
+      { label:'EBIT angepasst', key:'EBIT angepasst', isInput:false, calc: calcAdjustedEBIT },
+      { label:'EBITC (EBIT + CEO)', key:'EBITC', isInput:false, calc: calcEBITC },
+    ];
+
+    // toggle a single row open/closed
+    function toggleRow(key) {
+      const next = new Set(openRows);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      setOpenRows(next);
+    }
+
+    // build header
+    const header = e('tr', {},
+      e('th',{className:'px-2 py-1 bg-gray-200 text-left'}, 'Posten'),
+      ...years.map(y =>
+        e('th',{ key:y, className:'px-2 py-1 bg-gray-200 text-center'}, y)
+      )
     );
-    return isNaN(n) ? 0 : n;
-  }
 
-  function formatNum(val) {
-    const n = parseFloat(val);
-    return isNaN(n)
-      ? ''
-      : n.toLocaleString('de-CH');
-  }
+    // build each data row (and optional explanation row)
+    const body = [];
+    rows.forEach(r => {
+      const isOpen = openRows.has(r.key);
 
-  // Calculations
-  function calcEBITMargin(year) {
-    const rev  = parseNum(answers[`Umsatz ${year}`]);
-    const ebit = parseNum(answers[`EBIT ${year}`]);
-    return rev > 0
-      ? (ebit / rev * 100).toFixed(1) + '%'
-      : '';
-  }
+      // add an explanation row if open
+      if (isOpen && explanations[r.key]) {
+        body.push(
+          e('tr',{ key:r.key+'-exp' },
+            e('td',{
+                colSpan: years.length+1,
+                className:'bg-gray-50 px-3 py-1 text-sm text-gray-600 italic'
+              },
+              explanations[r.key]
+            )
+          )
+        );
+      }
 
-  function calcAdjustedEBIT(year) {
-    const ebit = parseNum(answers[`EBIT ${year}`]);
-    const adj  = parseNum(answers[`EBIT Anpassung ${year}`]);
-    return formatNum(ebit + adj);
-  }
+      // then the actual data row
+      body.push(
+        e('tr',{ key:r.key, className:'border-t' },
+          // label + toggle
+          e('td',{
+              className:'px-2 py-1 bg-gray-100 flex items-center'
+            },
+            e('button',{
+                type:'button',
+                onClick:()=>toggleRow(r.key),
+                className:'mr-2 text-lg leading-none select-none'
+              },
+              isOpen ? '▼' : '▶'
+            ),
+            e('span',{}, r.label)
+          ),
 
-  function calcEBITC(year) {
-    const adj   = parseNum(calcAdjustedEBIT(year));
-    const ceo   = parseNum(answers[`CEO-Saläre ${year}`]);
-    return formatNum(adj + ceo);
-  }
-
-  // Header row
-  const headerRow = e('tr', {},
-    e('th', { className: 'p-2 text-left bg-gray-200' }, 'Posten'),
-    ...years.map(y =>
-      e('th', {
-        key: y,
-        className: 'p-2 bg-gray-200 text-center'
-      }, y)
-    )
-  );
-
-  // Factory for each data row
-  function renderRow(label, key, isInput = true, calcFn = null) {
-    return e('tr', { className: 'border-t' },
-      // label cell + “+” toggle
-      e('td', {
-        className: 'p-2 bg-gray-100 flex items-center'
-      },
-        e('span', {}, label),
-        e('button', {
-          type:      'button',         // <-- prevent submit
-          className: 'ml-auto px-2',
-          onClick:   () => {}          // placeholder for future accordion
-        }, '+')
-      ),
-
-      // one cell per year
-      ...years.map(y => e('td', {
-        key:    y,
-        className: 'p-2 text-center'
-      },
-        selectedYears.includes(y)
-          ? isInput
-            // editable input
-            ? e('input', {
-                type:       'text',
-                inputMode:  'numeric',
-                value:      answers[`${key} ${y}`] || '',
-                onChange:   ev => handleChange(key, y, ev.target.value),
-                onKeyDown:  ev => {
-                  if (ev.key === 'Enter') ev.preventDefault();
-                },
-                className:  'w-24 border rounded px-1 text-right'
-              })
-            // computed display
-            : e('span', {}, calcFn(y))
-          : null
-      ))
-    );
-  }
-
-  return e('div', { className: 'space-y-4' },
-    // year‐checkboxes
-    e('div', { className: 'flex items-center gap-4' },
-      years.map(y =>
-        e('label', { key: y, className: 'flex items-center space-x-1' },
-          e('input', {
-            type:     'checkbox',
-            checked:  selectedYears.includes(y),
-            onChange: () => toggleYear(y)
-          }),
-          e('span', {}, y)
+          // one cell per year
+          ...years.map(y =>
+            e('td',{ key:y, className:'px-2 py-1 text-center' },
+              selectedYears.includes(y)
+                ? r.isInput
+                  // editable
+                  ? e('input',{
+                      type:'text',
+                      inputMode:'numeric',
+                      className:'w-24 border rounded px-1 text-right',
+                      value: formatNum(answers[`${r.key} ${y}`]||''),
+                      onChange:ev=>handleChange(r.key,y,ev.target.value),
+                      onKeyDown:ev=>{ if(ev.key==='Enter') ev.preventDefault(); }
+                    })
+                  // computed
+                  : e('span',{}, r.calc(y))
+                : null
+            )
+          )
         )
-      )
-    ),
+      );
+    });
 
-    // the P&L table
-    e('table', { className: 'w-full table-auto border-collapse text-sm' },
-      e('thead', {}, headerRow),
-      e('tbody', {},
-        renderRow('Umsatz',              'Umsatz'),
-        renderRow('EBIT',                'EBIT'),
-        renderRow('EBIT-Marge',          'EBIT-Marge',   false, calcEBITMargin),
-        renderRow('Abschreibungen',      'Abschreibungen'),
-        renderRow('CEO-Saläre',          'CEO-Saläre'),
-        renderRow('EBIT Anpassung',      'EBIT Anpassung'),
-        renderRow('EBIT angepasst',      'EBIT angepasst', false, calcAdjustedEBIT),
-        renderRow('EBITC (EBIT + CEO)',  'EBITC',         false, calcEBITC)
+    return e('div',{ className:'space-y-4' },
+      // year selectors
+      e('div',{ className:'flex gap-4' },
+        years.map(y =>
+          e('label',{ key:y, className:'flex items-center space-x-1' },
+            e('input',{
+              type:'checkbox',
+              checked: selectedYears.includes(y),
+              onChange:()=>toggleYear(y)
+            }),
+            e('span',{}, y)
+          )
+        )
+      ),
+      // P&L table
+      e('table',{ className:'w-full table-auto border-collapse text-sm' },
+        e('thead',{}, header),
+        e('tbody',{}, ...body)
       )
-    )
-  );
-}
+    );
+  }
 
-window.FinanceInput = FinanceInput;
+  window.FinanceInput = FinanceInput;
+})();
