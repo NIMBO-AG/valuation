@@ -7,7 +7,7 @@
     const e = React.createElement;
     const years = [2023, 2024, 2025];
 
-    // 1) Default: alle Jahre vorauswählen
+    // 1) Default-Jahre
     useEffect(() => {
       if (!Array.isArray(answers['Finance Years'])) {
         setAnswers({ ...answers, 'Finance Years': [...years] });
@@ -33,7 +33,7 @@
       return n == null ? '' : n.toLocaleString('de-CH');
     }
 
-    // 3) Abhängigkeits-Flags
+    // 3) Flags
     const revC  = selectedYears.every(y => parseNum(answers[`Umsatz ${y}`]) != null);
     const ceoQ  = answers['Einzelgeschäftsführung'] != null;
     const ceoC  = revC && ceoQ && selectedYears.every(y => parseNum(answers[`CEO-Saläre ${y}`]) != null);
@@ -41,14 +41,13 @@
     const ebitC = absC && selectedYears.every(y => parseNum(answers[`EBIT ${y}`]) != null);
     const adjC  = ebitC && selectedYears.every(y => parseNum(answers[`EBIT Anpassung ${y}`]) != null);
 
-    // 4) Setter-Funktionen
+    // 4) Setter
     function toggleRow(key) {
       setOpenRow(openRow === key ? null : key);
     }
     function setField(key, y, raw) {
       if (key === 'EBIT') {
-        const rev = parseNum(answers[`Umsatz ${y}`]),
-              val = parseNum(raw);
+        const rev = parseNum(answers[`Umsatz ${y}`]), val = parseNum(raw);
         if (rev != null && val != null && val > rev) raw = rev.toString();
       }
       setAnswers({ ...answers, [`${key} ${y}`]: raw });
@@ -73,7 +72,7 @@
       return formatNum((calcAdjEBIT(y)+ceo).toString());
     }
 
-    // 6) Reihen-Definition
+    // 6) Reihen
     const rows = [
       { label:'Umsatz',           key:'Umsatz',         input:true,  show:()=>true   },
       { label:'CEO-Saläre',       key:'CEO-Saläre',     input:true,  show:()=>revC   },
@@ -85,23 +84,23 @@
       { label:'EBITC (EBIT+CEO)', key:'EBITC (EBIT+CEO)',input:false,show:()=>ebitC }
     ].filter(r => r.show());
 
-    // 7) Row-Renderer
+    // 7) Renderer
     function renderRow(r) {
       const { label, key, input } = r;
       const isOpen = openRow === key;
 
-      // ───────── Spezialfall Umsatz ─────────
+      // ─── Umsatz mit Instruktion oben ───
       if (key === 'Umsatz') {
         const main = e('tr',{ key },
           e('td',{ className:'bg-gray-100 px-2 py-1 w-2/5 select-none' },
             e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-              isOpen?'▼':'▶'
+              isOpen ? '▼' : '▲'
             ),
             e('span',{ className:'font-medium' }, label)
           ),
           years.map(y=>e('td',{ key:y, className:'px-1 py-1 text-right' },
             selectedYears.includes(y)
-              ? e('input',{
+              ? e('input',{ 
                   type:'text',
                   className:'w-full border rounded px-1',
                   inputMode:'numeric',
@@ -115,23 +114,22 @@
         );
         if (isOpen) {
           const info = e('tr',{ key:key+'-instr' },
-            e('td',{ colSpan:years.length+1, className:'bg-gray-50 px-2 py-2 italic text-gray-700' },
+            e('td',{ colSpan:years.length+1, className:'bg-gray-50 px-2 py-2 italic text-gray-700 text-right' },
               'Jahresumsatz in CHF (ohne MWSt.)'
             )
           );
-          // erst info, dann main
           return [ info, main ];
         }
         return main;
       }
 
-      // ───────── Spezialfall CEO-Saläre ─────────
+      // ─── CEO-Saläre mit Frage/Instruktion oben ───
       if (key === 'CEO-Saläre') {
         const answered = answers['Einzelgeschäftsführung'] != null;
         const main = e('tr',{ key },
           e('td',{ className:'bg-gray-100 px-2 py-1 w-2/5 select-none' },
             e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-              isOpen?'▼':'▶'
+              isOpen ? '▼' : '▲'
             ),
             e('span',{ className:'font-medium' }, label)
           ),
@@ -154,7 +152,7 @@
             ? 'Führen Sie das Unternehmen allein? („Nein“ bei mehreren Partner:innen.)'
             : 'Geben Sie hier das Jahresgehalt des/der Geschäftsführer:in in CHF an.';
           const info = e('tr',{ key:key+'-sub' },
-            e('td',{ colSpan:years.length+1, className:'bg-gray-50 px-2 py-2' },
+            e('td',{ colSpan:years.length+1, className:'bg-gray-50 px-2 py-2 text-right' },
               e('p',{ className:'italic text-gray-700 mb-1' }, text),
               !answered && ['Ja','Nein'].map(opt=>
                 e('label',{ key:opt, className:'inline-flex items-center mr-4' },
@@ -166,17 +164,16 @@
               )
             )
           );
-          // erst info, dann main
           return [ info, main ];
         }
         return main;
       }
 
-      // ───────── Alle anderen ─────────
+      // ─── Alle anderen Zeilen ───
       return e('tr',{ key },
         e('td',{ className:'bg-gray-100 px-2 py-1 w-2/5 select-none' },
           e('button',{ type:'button', onClick:()=>toggleRow(key), className:'mr-1' },
-            isOpen?'▼':'▶'
+            isOpen ? '▼' : '▲'
           ),
           e('span',{ className:'font-medium' }, label)
         ),
@@ -203,7 +200,7 @@
       );
     }
 
-    // 8) Tabelle rendern
+    // 8) Gesamttabelle
     return e('div',{ className:'overflow-x-auto' },
       e('table',{ className:'table-fixed w-full text-sm border-collapse' },
         e('thead',{},
