@@ -23,7 +23,6 @@
     }
 
     function handleChange(key, year, raw) {
-      // allow only digits, comma, dot, minus
       const cleaned = (raw || '')
         .replace(/[^0-9\.\-,]/g, '')
         .replace(/(\..*?)\./g, '$1')
@@ -37,15 +36,14 @@
     function parseNum(val) {
       const str = (val == null ? '' : String(val));
       const normalized = str
-        .replace(/\./g, '')    // drop thousands
-        .replace(',', '.');    // comma → decimal
+        .replace(/\./g, '')
+        .replace(',', '.');
       const n = parseFloat(normalized);
       return isNaN(n) ? 0 : n;
     }
 
     function formatNum(val) {
       const n = parseNum(val);
-      // blank if original was blank
       if ((val == null || val === '') && n === 0) return '';
       return n.toLocaleString('de-CH');
     }
@@ -73,7 +71,7 @@
     const explanations = {
       'Umsatz':         'Geben Sie Ihren Jahresumsatz (ohne MwSt) in CHF an.',
       'EBIT':           'Ergebnis vor Zinsen & Steuern (nach GF-Löhnen).',
-      'Abschreibungen': 'Jährliche Wertminderungen auf Ihre Sach- und IMM-Güter.',
+      'Abschreibungen': 'Jährliche Wertminderungen auf Sach- und IMM-Güter.',
       'CEO-Saläre':     'Summe aller ausgezahlten Löhne der Geschäftsführung.',
       'EBIT Anpassung': 'Korrekturen für einmalige oder außerordentliche Effekte.'
     };
@@ -106,10 +104,9 @@
     // build body
     const body = [];
     rows.forEach(r => {
-      // the main row
+      // main row
       body.push(
         e('tr', { key:r.key, className:'border-t' },
-          // label + toggle
           e('td', { className:'px-2 py-1 bg-gray-100 flex items-center' },
             e('button', {
               type:'button',
@@ -118,7 +115,6 @@
             }, openRows.has(r.key) ? '▼' : '▶'),
             e('span',{}, r.label)
           ),
-          // values
           ...years.map(y =>
             e('td',{ key:y, className:'px-2 py-1 text-center' },
               selectedYears.includes(y)
@@ -128,6 +124,13 @@
                         inputMode:'numeric',
                         className:'w-24 border rounded px-1 text-right',
                         value: formatNum(answers[`${r.key} ${y}`]),
+                        onFocus: ()=> {
+                          if (!openRows.has(r.key)) {
+                            const next = new Set(openRows);
+                            next.add(r.key);
+                            setOpenRows(next);
+                          }
+                        },
                         onChange:ev=>handleChange(r.key,y,ev.target.value),
                         onKeyDown:ev=>{ if(ev.key==='Enter') ev.preventDefault(); }
                       })
@@ -139,7 +142,7 @@
         )
       );
 
-      // explanation row *below* the inputs
+      // explanation row
       if (openRows.has(r.key) && explanations[r.key]) {
         body.push(
           e('tr',{ key:r.key+'-exp' },
@@ -166,8 +169,7 @@
           )
         )
       ),
-
-      // the P&L table
+      // the table
       e('table',{ className:'w-full table-auto border-collapse text-sm' },
         e('thead',{}, header),
         e('tbody',{}, ...body)
