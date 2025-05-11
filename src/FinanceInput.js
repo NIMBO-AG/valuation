@@ -12,8 +12,8 @@
       ? answers['Finance Years']
       : years;
 
-    // which rows are "open" (show explanation)
-    const [openRows, setOpenRows] = useState(new Set());
+    // which single row is open (show explanation)
+    const [openRow, setOpenRow] = useState(null);
 
     function toggleYear(year) {
       const next = selectedYears.includes(year)
@@ -88,9 +88,7 @@
     ];
 
     function toggleRow(key) {
-      const next = new Set(openRows);
-      next.has(key) ? next.delete(key) : next.add(key);
-      setOpenRows(next);
+      setOpenRow(openRow === key ? null : key);
     }
 
     // table header
@@ -104,7 +102,6 @@
     // build body
     const body = [];
     rows.forEach(r => {
-      // main row
       body.push(
         e('tr', { key:r.key, className:'border-t' },
           e('td', { className:'px-2 py-1 bg-gray-100 flex items-center' },
@@ -112,7 +109,7 @@
               type:'button',
               onClick:()=>toggleRow(r.key),
               className:'mr-2 select-none'
-            }, openRows.has(r.key) ? '▼' : '▶'),
+            }, openRow === r.key ? '▼' : '▶'),
             e('span',{}, r.label)
           ),
           ...years.map(y =>
@@ -124,13 +121,7 @@
                         inputMode:'numeric',
                         className:'w-24 border rounded px-1 text-right',
                         value: formatNum(answers[`${r.key} ${y}`]),
-                        onFocus: ()=> {
-                          if (!openRows.has(r.key)) {
-                            const next = new Set(openRows);
-                            next.add(r.key);
-                            setOpenRows(next);
-                          }
-                        },
+                        onFocus: ()=>{ if(openRow !== r.key) toggleRow(r.key); },
                         onChange:ev=>handleChange(r.key,y,ev.target.value),
                         onKeyDown:ev=>{ if(ev.key==='Enter') ev.preventDefault(); }
                       })
@@ -141,9 +132,8 @@
           )
         )
       );
-
-      // explanation row
-      if (openRows.has(r.key) && explanations[r.key]) {
+      // only one explanation row, if that row is open
+      if (openRow === r.key && explanations[r.key]) {
         body.push(
           e('tr',{ key:r.key+'-exp' },
             e('td',{
